@@ -226,7 +226,7 @@ a:hover {
 /* ============ Hero Section ============ */
 .hero {
   text-align: center;
-  padding: 80px 0 40px;
+  padding: 80px 0 20px;
 }
 
 .hero-title {
@@ -248,7 +248,7 @@ a:hover {
   font-size: 1.15rem;
   color: var(--text-secondary);
   max-width: 600px;
-  margin: 0 auto 48px;
+  margin: 0 auto 24px;
   line-height: 1.7;
 }
 
@@ -758,6 +758,36 @@ tr:hover td {
   margin-bottom: 8px;
 }
 
+/* ============ AdSense (above footer) ============ */
+.ad-sense-region {
+  max-width: 920px;
+  margin: 48px auto 0;
+  padding: 0 24px;
+}
+
+.ad-sense-inner {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.ad-sense-inner .adsbygoogle {
+  min-height: 90px;
+}
+
+@media (max-width: 768px) {
+  .ad-sense-region {
+    margin-top: 32px;
+    padding: 0 16px;
+  }
+
+  .ad-sense-inner {
+    padding: 12px 14px 14px;
+  }
+}
+
 /* ============ Footer ============ */
 .site-footer {
   border-top: 1px solid var(--border);
@@ -770,8 +800,8 @@ tr:hover td {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 40px 48px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 40px 56px;
   align-items: start;
   margin-bottom: 28px;
 }
@@ -791,7 +821,9 @@ tr:hover td {
 
 .footer-aside {
   display: grid;
-  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 20px 40px;
+  align-items: start;
 }
 
 .footer-aside-block {
@@ -857,6 +889,136 @@ tr:hover td {
 @media (max-width: 480px) {
   .footer-nav-columns {
     grid-template-columns: 1fr;
+  }
+
+  .footer-aside {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+/* ============ Developer books teaser (home) ============ */
+.developer-books-teaser {
+  margin: 36px 0 8px;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.developer-books-teaser-lead {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0 0 18px;
+  text-align: left;
+}
+
+.developer-books-teaser-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  overflow: hidden;
+}
+
+.developer-books-teaser-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 22px;
+}
+
+.developer-books-teaser-inner--animate {
+  animation: developerBooksTeaserIn 0.45s ease;
+}
+
+@keyframes developerBooksTeaserIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .developer-books-teaser-inner--animate {
+    animation: none;
+  }
+}
+
+.developer-books-teaser-cover-link {
+  flex-shrink: 0;
+  align-self: flex-start;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+}
+
+.developer-books-teaser-cover {
+  display: block;
+  width: 120px;
+  height: auto;
+  max-height: 168px;
+  object-fit: cover;
+}
+
+.developer-books-teaser-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.developer-books-teaser-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.developer-books-teaser-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.developer-books-teaser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.developer-books-teaser-cta {
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .developer-books-teaser-inner {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .developer-books-teaser-meta {
+    align-items: center;
+  }
+
+  .developer-books-teaser-lead {
+    text-align: left;
+  }
+
+  .developer-books-teaser-actions {
+    justify-content: center;
   }
 }
 
@@ -1079,7 +1241,7 @@ tr:hover td {
   }
 
   .hero {
-    padding: 40px 0 20px;
+    padding: 40px 0 10px;
   }
 
   .url-form-container {

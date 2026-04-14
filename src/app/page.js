@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import UrlForm from '@/components/UrlForm';
 import UrlResult from '@/components/UrlResult';
+import DeveloperBooksTeaser from '@/components/DeveloperBooksTeaser';
 
 export default function HomePage() {
   const [user, setUser] = useState(null);
@@ -40,11 +41,7 @@ export default function HomePage() {
               <br />
               짧은 URL
             </h1>
-            <p className="hero-subtitle">
-              긴 URL을 한글로 된 짧은 주소로 변환해보세요.
-              <br />
-              원하는 단어로 직접 커스터마이징할 수 있습니다.
-            </p>
+            <p className="hero-subtitle">긴 URL을 한글로 된 짧은 주소로 변환해보세요.</p>
           </div>
         </section>
 
@@ -59,6 +56,10 @@ export default function HomePage() {
             <UrlResult data={result} user={user} />
           </div>
         )}
+
+        <div className="container">
+          <DeveloperBooksTeaser />
+        </div>
 
         {/* Stats */}
         <div className="container">

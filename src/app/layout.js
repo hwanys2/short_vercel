@@ -1,4 +1,7 @@
 import './globals.css';
+import Script from 'next/script';
+
+const ADSENSE_CLIENT = 'ca-pub-8902099051011521';
 
 export const metadata = {
   title: '숏.한국 - 한글 URL 단축 서비스 | 긴 URL을 짧고 기억하기 쉬운 한글 주소로 변환',
@@ -38,6 +41,13 @@ export default function RootLayout({ children }) {
               gtag('config', 'G-F227R45H63');
             `,
           }}
+        />
+        <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+          id="adsbygoogle-js"
         />
       </head>
       <body>{children}</body>

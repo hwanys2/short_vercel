@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import AdSenseSlot from '@/components/AdSenseSlot';
 
 export default function Footer() {
   return (
-    <footer className="site-footer">
+    <>
+      <AdSenseSlot />
+      <footer className="site-footer">
       <div className="container">
         <div className="footer-grid">
           <nav className="footer-nav" aria-label="서비스 안내">
@@ -106,5 +109,6 @@ export default function Footer() {
         </p>
       </div>
     </footer>
+    </>
   );
 }
