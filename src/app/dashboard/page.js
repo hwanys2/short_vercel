@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -220,6 +221,14 @@ export default function DashboardPage() {
                           <td>{url.visits}</td>
                           <td>
                             <div className="url-actions">
+                              <Link
+                                href={`/dashboard/edit/${encodeURIComponent(url.code)}`}
+                                className="btn btn-secondary btn-icon"
+                                title="수정"
+                                aria-label="수정"
+                              >
+                                ✏️
+                              </Link>
                               <button className="btn btn-secondary btn-icon" onClick={() => copyUrl(url.code)} title="복사">
                                 📋
                               </button>
