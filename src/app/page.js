@@ -67,7 +67,7 @@ export default function HomePage() {
               <div className="stat-number">
                 <AnimatedNumber value={stats.total} />
               </div>
-              <div className="stat-label">전체 URL</div>
+              <div className="stat-label">현재 활성 URL</div>
             </div>
             <div className="stat-card">
               <div className="stat-number">
@@ -80,38 +80,6 @@ export default function HomePage() {
                 <AnimatedNumber value={stats.users} />
               </div>
               <div className="stat-label">회원 수</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Features Section */}
-        <div className="container" style={{ marginBottom: '60px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-              <span className="gradient-text">왜 숏.한국인가요?</span>
-            </h2>
-          </div>
-          <div className="stats-row">
-            <div className="stat-card" style={{ textAlign: 'left', padding: '28px' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🇰🇷</div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px' }}>한글 URL 지원</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                숏.한국/수학, 숏.한국/영어 등 한글로 된 기억하기 쉬운 단축 URL을 만들 수 있습니다.
-              </p>
-            </div>
-            <div className="stat-card" style={{ textAlign: 'left', padding: '28px' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '12px' }}>♾️</div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px' }}>회원 영구 URL</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                회원가입하면 영구적으로 유지되는 개인 단축 URL을 무제한으로 만들 수 있습니다.
-              </p>
-            </div>
-            <div className="stat-card" style={{ textAlign: 'left', padding: '28px' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📊</div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px' }}>클릭 통계</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                대시보드에서 각 URL의 방문 횟수와 통계를 실시간으로 확인할 수 있습니다.
-              </p>
             </div>
           </div>
         </div>
