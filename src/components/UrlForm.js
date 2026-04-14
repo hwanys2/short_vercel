@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useState } from 'react';
 
 export default function UrlForm({ user, onResult }) {
   const [originalUrl, setOriginalUrl] = useState('');
@@ -118,6 +119,13 @@ export default function UrlForm({ user, onResult }) {
             <>🔗 URL 단축하기</>
           )}
         </button>
+        {!user && (
+          <p className="url-form-guest-note">
+            좋은 단축 코드를 나눠 사용하기 위해 만료 기간이 설정됩니다. 영구 단축을 원하시면{' '}
+            <Link href="/register">회원가입</Link>을 하세요. 숏.한국/닉네임/단축코드로 영구적인 단축주소를 가질 수
+            있습니다.
+          </p>
+        )}
       </form>
     </div>
   );
