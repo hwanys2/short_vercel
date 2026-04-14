@@ -1,7 +1,12 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildPageMetadata } from '@/lib/siteMetadata';
 
-export const metadata = { title: '개인정보처리방침 | 숏.한국' };
+export const metadata = buildPageMetadata({
+  pathname: '/privacy',
+  title: '개인정보처리방침 | 숏.한국',
+  description: '숏.한국 서비스의 개인정보 수집·이용, 보관, 제3자 제공, 이용자 권리 등에 관한 안내입니다.',
+});
 
 export default function PrivacyPage() {
   return (

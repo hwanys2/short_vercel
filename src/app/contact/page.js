@@ -1,7 +1,12 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildPageMetadata } from '@/lib/siteMetadata';
 
-export const metadata = { title: '문의 | 숏.한국' };
+export const metadata = buildPageMetadata({
+  pathname: '/contact',
+  title: '문의 | 숏.한국',
+  description: '숏.한국 서비스 문의·건의·오류 신고. 한글 URL 단축 서비스 관련 연락처 안내입니다.',
+});
 
 export default function ContactPage() {
   return (

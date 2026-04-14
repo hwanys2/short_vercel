@@ -1,7 +1,12 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildPageMetadata } from '@/lib/siteMetadata';
 
-export const metadata = { title: '블로그 | 숏.한국' };
+export const metadata = buildPageMetadata({
+  pathname: '/blog',
+  title: '블로그 | 숏.한국',
+  description: '숏.한국 한글 URL 단축 서비스 소식, 업데이트, 활용 팁을 담은 블로그입니다.',
+});
 
 export default function BlogPage() {
   return (

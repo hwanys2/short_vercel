@@ -1,16 +1,18 @@
 import './globals.css';
 import Script from 'next/script';
+import { getMetadataBase } from '@/lib/siteUrl';
 
 const ADSENSE_CLIENT = 'ca-pub-8902099051011521';
 
 export const metadata = {
+  metadataBase: getMetadataBase(),
   title: '숏.한국 - 한글 URL 단축 서비스 | 긴 URL을 짧고 기억하기 쉬운 한글 주소로 변환',
   description: '숏.한국은 긴 URL을 한글로 된 짧은 주소로 변환해주는 무료 URL 단축 서비스입니다.',
   keywords: 'URL 단축, 한글 URL, 단축 URL, URL 줄이기, 짧은 URL, 한국 URL 단축, 무료 URL 단축',
   authors: [{ name: '숏.한국' }],
   openGraph: {
     type: 'website',
-    url: 'https://숏.한국/',
+    url: '/',
     title: '숏.한국 - 한글 URL 단축 서비스',
     description: '긴 URL을 한글로 된 짧은 주소로 변환해보세요.',
     siteName: '숏.한국',
@@ -29,7 +31,6 @@ export default function RootLayout({ children }) {
     <html lang="ko">
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="canonical" href="https://숏.한국/" />
         {/* Google Analytics */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-F227R45H63" />
         <script

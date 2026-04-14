@@ -1,7 +1,13 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildPageMetadata } from '@/lib/siteMetadata';
 
-export const metadata = { title: '사용 가이드 | 숏.한국' };
+export const metadata = buildPageMetadata({
+  pathname: '/guide',
+  title: '사용 가이드 | 숏.한국',
+  description:
+    '숏.한국 사용 방법: 비회원·회원 URL 단축, 한글 코드, 만료 기간, 대시보드 관리까지 단계별로 안내합니다.',
+});
 
 export default function GuidePage() {
   return (

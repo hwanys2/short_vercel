@@ -1,7 +1,12 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildPageMetadata } from '@/lib/siteMetadata';
 
-export const metadata = { title: '이용약관 | 숏.한국' };
+export const metadata = buildPageMetadata({
+  pathname: '/terms',
+  title: '이용약관 | 숏.한국',
+  description: '숏.한국 URL 단축 서비스 이용약관. 서비스 이용 조건, 회원·비회원 정책, 책임의 한계 등을 정합니다.',
+});
 
 export default function TermsPage() {
   return (

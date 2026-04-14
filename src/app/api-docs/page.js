@@ -1,7 +1,13 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildPageMetadata } from '@/lib/siteMetadata';
 
-export const metadata = { title: 'API 문서 | 숏.한국' };
+export const metadata = buildPageMetadata({
+  pathname: '/api-docs',
+  title: 'API 문서 | 숏.한국',
+  description:
+    '숏.한국 REST API 문서. URL 단축 요청 형식, 응답 필드, 인증·한도 등 개발자용 연동 가이드입니다.',
+});
 
 export default function ApiDocsPage() {
   return (
