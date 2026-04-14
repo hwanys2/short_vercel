@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 // 정적 페이지 경로 (이 경로들은 리다이렉트 처리하지 않음)
 const STATIC_PATHS = [
+  '/not-found',
   '/login',
   '/register',
   '/dashboard',
