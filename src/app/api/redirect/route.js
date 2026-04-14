@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { normalizeShortPathSegment, readMiddlewareShortHeader } from '@/lib/pathSegments';
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get('code');
-  const username = searchParams.get('username');
+  const { searchParams } = request.nextUrl;
+  const code =
+    readMiddlewareShortHeader(request, 'short-code') ??
+    (searchParams.get('code') != null ? normalizeShortPathSegment(searchParams.get('code')) : null);
+  const username =
+    readMiddlewareShortHeader(request, 'short-username') ??
+    (searchParams.get('username') != null
+      ? normalizeShortPathSegment(searchParams.get('username'))
+      : null);
 
   if (!code) {
     return NextResponse.json({ error: 'Code is required' }, { status: 400 });
