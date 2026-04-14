@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_short_users_username ON short_users(username);
 -- 2. URL 테이블 생성
 CREATE TABLE IF NOT EXISTS short_urls (
   id BIGSERIAL PRIMARY KEY,
-  legacy_id INTEGER,
+  legacy_id INTEGER UNIQUE,
   original_url TEXT NOT NULL,
   code VARCHAR(100) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),

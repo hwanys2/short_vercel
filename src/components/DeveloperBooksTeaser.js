@@ -34,8 +34,7 @@ export default function DeveloperBooksTeaser() {
   return (
     <aside className="developer-books-teaser" aria-label="개발자 소개 및 도서">
       <p className="developer-books-teaser-lead">
-        숏.한국은 현직 교사가 수업·업무에 쓰려고 직접 만들어 무료로 돌리고 있어요. 서버와 유지에 부담이 될 때도 있는데, 같은 저자의 책을
-        필요하실 때 사 주시면 그만큼 여유 있게 이어 가는 데 도움이 됩니다. 부담 없이 둘러만 보셔도 괜찮아요.
+        숏한국 개발 교사의 책입니다. 책 구입은 서버 운영에 큰 힘이 됩니다.
       </p>
       <div className="developer-books-teaser-card">
         <div
@@ -58,7 +57,7 @@ export default function DeveloperBooksTeaser() {
             />
           </a>
           <div className="developer-books-teaser-meta">
-            <p className="developer-books-teaser-label">이번에 보여 드리는 책</p>
+            <p className="developer-books-teaser-label">추천 도서</p>
             <p className="developer-books-teaser-title">{book.title}</p>
             <div className="developer-books-teaser-actions">
               <a

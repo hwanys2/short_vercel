@@ -899,18 +899,19 @@ tr:hover td {
 
 /* ============ Developer books teaser (home) ============ */
 .developer-books-teaser {
-  margin: 36px 0 8px;
+  margin: 36px auto 56px;
   max-width: 720px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .developer-books-teaser-lead {
-  font-size: 0.88rem;
-  line-height: 1.65;
-  color: var(--text-secondary);
-  margin: 0 0 18px;
-  text-align: left;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  margin: 0 auto 18px;
+  text-align: center;
+  max-width: 36em;
 }
 
 .developer-books-teaser-card {
@@ -1014,7 +1015,8 @@ tr:hover td {
   }
 
   .developer-books-teaser-lead {
-    text-align: left;
+    text-align: center;
+    font-size: 0.92rem;
   }
 
   .developer-books-teaser-actions {
