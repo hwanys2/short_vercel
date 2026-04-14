@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -98,31 +99,59 @@ export default function RegisterPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="reg-password">비밀번호</label>
+                <label className="form-label" htmlFor="reg-password">
+                  비밀번호
+                  <span
+                    style={{
+                      fontWeight: 400,
+                      fontSize: '0.75rem',
+                      color: 'var(--text-muted)',
+                      marginLeft: '8px',
+                    }}
+                  >
+                    (영문·숫자로 입력)
+                  </span>
+                </label>
                 <input
                   id="reg-password"
                   type="password"
                   className="form-input"
                   value={form.password}
-                  onChange={(e) => update('password', e.target.value)}
+                  onChange={(e) => update('password', sanitizeAsciiPasswordInput(e.target.value))}
                   required
                   lang="en"
+                  inputMode="latin"
+                  spellCheck={false}
                 />
                 <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                  ℹ️ 비밀번호는 최소 8자 이상이어야 합니다.
+                  ℹ️ 최소 8자, 영문·숫자·기호(반각)만 사용됩니다. 한글 입력은 자동으로 제외됩니다.
                 </small>
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="reg-password-confirm">비밀번호 확인</label>
+                <label className="form-label" htmlFor="reg-password-confirm">
+                  비밀번호 확인
+                  <span
+                    style={{
+                      fontWeight: 400,
+                      fontSize: '0.75rem',
+                      color: 'var(--text-muted)',
+                      marginLeft: '8px',
+                    }}
+                  >
+                    (영문·숫자로 입력)
+                  </span>
+                </label>
                 <input
                   id="reg-password-confirm"
                   type="password"
                   className="form-input"
                   value={form.password_confirm}
-                  onChange={(e) => update('password_confirm', e.target.value)}
+                  onChange={(e) => update('password_confirm', sanitizeAsciiPasswordInput(e.target.value))}
                   required
                   lang="en"
+                  inputMode="latin"
+                  spellCheck={false}
                 />
               </div>
 

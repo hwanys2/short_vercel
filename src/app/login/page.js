@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -71,17 +72,34 @@ export default function LoginPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="login-password">비밀번호</label>
+                <label className="form-label" htmlFor="login-password">
+                  비밀번호
+                  <span
+                    style={{
+                      fontWeight: 400,
+                      fontSize: '0.75rem',
+                      color: 'var(--text-muted)',
+                      marginLeft: '8px',
+                    }}
+                  >
+                    (영문·숫자로 입력)
+                  </span>
+                </label>
                 <input
                   id="login-password"
                   type="password"
                   className="form-input"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(sanitizeAsciiPasswordInput(e.target.value))}
                   required
                   autoComplete="current-password"
                   lang="en"
+                  inputMode="latin"
+                  spellCheck={false}
                 />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                  한글은 입력되지 않습니다.
+                </small>
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }} disabled={loading}>
