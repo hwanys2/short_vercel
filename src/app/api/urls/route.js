@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest } from '@/lib/auth';
+import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 
 // 내 URL 목록 가져오기
 export async function GET(request) {
@@ -81,7 +82,10 @@ export async function POST(request) {
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json({ success: false, message: '이미 사용 중인 단축 코드입니다.' }, { status: 409 });
+      return NextResponse.json(
+        { success: false, message: memberDuplicateCodeMessage() },
+        { status: 409 }
+      );
     }
 
     // 100년 만료

@@ -2,6 +2,7 @@
 // POST /api/v1/shorten 으로 외부에서 호출 가능
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { guestDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 
 export async function GET() {
   return NextResponse.json({
@@ -107,7 +108,11 @@ export async function POST(request) {
         const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
         if (!isExpired) {
           return NextResponse.json(
-            { status: 'error', message: '이미 사용 중인 단축 코드입니다.' },
+            {
+              status: 'error',
+              message: guestDuplicateCodeMessage(existing.expiration_date),
+              expiration_date: existing.expiration_date ?? null,
+            },
             { status: 409 }
           );
         }

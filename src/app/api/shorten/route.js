@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest } from '@/lib/auth';
+import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 
 export async function POST(request) {
   try {
@@ -63,8 +64,15 @@ export async function POST(request) {
     if (existing) {
       const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
       if (!isExpired) {
+        const message = userId
+          ? memberDuplicateCodeMessage()
+          : guestDuplicateCodeMessage(existing.expiration_date);
         return NextResponse.json(
-          { status: 'error', message: '이미 사용 중인 단축 코드입니다.' },
+          {
+            status: 'error',
+            message,
+            expiration_date: existing.expiration_date ?? null,
+          },
           { status: 409 }
         );
       }
