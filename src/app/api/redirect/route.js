@@ -43,13 +43,6 @@ export async function GET(request) {
 
       if (urlData) {
         originalUrl = urlData.original_url;
-        // 방문 횟수 업데이트 (비동기, 실패해도 리다이렉트 진행)
-        supabase
-          .from('short_urls')
-          .update({ visits: urlData.visits + 1, last_visit: new Date().toISOString() })
-          .eq('id', urlData.id)
-          .then(() => {});
-        // RPC로 atomic increment
         supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
       }
     } else {
