@@ -24,7 +24,7 @@ export async function GET(request) {
         .single();
 
       if (!user) {
-        return NextResponse.redirect(new URL('/not-found', request.url), 302);
+        return NextResponse.redirect(new URL('/missing.link', request.url), 302);
       }
 
       const { data: urlData } = await supabase
@@ -67,9 +67,9 @@ export async function GET(request) {
     }
 
     // URL을 찾지 못한 경우
-    return NextResponse.redirect(new URL('/not-found', request.url), 302);
+    return NextResponse.redirect(new URL('/missing.link', request.url), 302);
   } catch (error) {
     console.error('Redirect error:', error);
-    return NextResponse.redirect(new URL('/not-found', request.url), 302);
+    return NextResponse.redirect(new URL('/missing.link', request.url), 302);
   }
 }

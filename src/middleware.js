@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 
 // 정적 페이지 경로 (이 경로들은 리다이렉트 처리하지 않음)
+// 단축 코드는 [가-힣a-zA-Z0-9_-]+ 만 허용 → 점(.)이 들어간 경로는 예약(리다이렉트 루프 방지)
 const STATIC_PATHS = [
-  '/not-found',
+  '/missing.link',
   '/login',
   '/register',
   '/dashboard',
