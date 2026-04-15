@@ -1,8 +1,14 @@
 import './globals.css';
 import Script from 'next/script';
+import { getDefaultOgImageUrl } from '@/lib/ogImageUrl';
 import { getMetadataBase } from '@/lib/siteUrl';
 
 const ADSENSE_CLIENT = 'ca-pub-8902099051011521';
+
+const defaultOgImage = getDefaultOgImageUrl();
+const ogImageEntry = defaultOgImage
+  ? [{ url: defaultOgImage, width: 1200, height: 630, alt: '숏.한국' }]
+  : undefined;
 
 export const metadata = {
   metadataBase: getMetadataBase(),
@@ -17,11 +23,13 @@ export const metadata = {
     description: '긴 URL을 한글로 된 짧은 주소로 변환해보세요.',
     siteName: '숏.한국',
     locale: 'ko_KR',
+    ...(ogImageEntry && { images: ogImageEntry }),
   },
   twitter: {
     card: 'summary_large_image',
     title: '숏.한국 - 한글 URL 단축 서비스',
     description: '긴 URL을 한글로 된 짧은 주소로 변환해보세요.',
+    ...(defaultOgImage && { images: [defaultOgImage] }),
   },
   robots: 'index, follow',
 };
