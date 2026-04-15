@@ -27,16 +27,21 @@ export async function GET(request) {
     // URL 목록
     const { data: urls, error } = await supabase
       .from('short_urls')
-      .select('code, original_url, created_at, visits, last_visit')
+      .select('code, original_url, created_at, visits, last_visit, link_password_hash')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + perPage - 1);
 
     if (error) throw error;
 
+    const safeUrls = (urls || []).map(({ link_password_hash, ...u }) => ({
+      ...u,
+      password_enabled: !!link_password_hash,
+    }));
+
     return NextResponse.json({
       success: true,
-      urls: urls || [],
+      urls: safeUrls,
       total: count || 0,
       page,
       per_page: perPage,

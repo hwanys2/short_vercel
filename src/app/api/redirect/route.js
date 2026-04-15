@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment, readMiddlewareShortHeader } from '@/lib/pathSegments';
+import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 
 export async function GET(request) {
   const { searchParams } = request.nextUrl;
@@ -36,14 +37,30 @@ export async function GET(request) {
 
       const { data: urlData } = await supabase
         .from('short_urls')
-        .select('original_url, id')
+        .select('original_url, id, link_password_hash, link_password_unlock_version')
         .eq('code', code)
         .eq('user_id', user.id)
         .single();
 
       if (urlData) {
-        originalUrl = urlData.original_url;
-        supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+        const protectedLink =
+          urlData.link_password_hash != null && String(urlData.link_password_hash).length > 0;
+        const unlockVersion = Number(urlData.link_password_unlock_version) || 0;
+
+        if (protectedLink) {
+          if (isValidLinkUnlockCookie(request, username, code, unlockVersion)) {
+            originalUrl = urlData.original_url;
+            supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+          } else {
+            const gate = new URL('/link-gate', request.url);
+            gate.searchParams.set('username', username);
+            gate.searchParams.set('code', code);
+            return NextResponse.redirect(gate, 302);
+          }
+        } else {
+          originalUrl = urlData.original_url;
+          supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+        }
       }
     } else {
       // 비회원 URL 패턴: /code (만료되지 않은 것만)

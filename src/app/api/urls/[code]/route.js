@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest } from '@/lib/auth';
+import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
+
+function sanitizeUrlRow(row) {
+  if (!row) return row;
+  const { link_password_hash: _h, link_password_unlock_version: _v, ...rest } = row;
+  return {
+    ...rest,
+    password_enabled: !!row.link_password_hash,
+  };
+}
 
 function decodeCodeParam(code) {
   try {
@@ -24,7 +33,7 @@ export async function GET(request, { params }) {
 
     const { data: row, error } = await supabase
       .from('short_urls')
-      .select('id, code, original_url, created_at, visits, last_visit')
+      .select('id, code, original_url, created_at, visits, last_visit, link_password_hash')
       .eq('code', code)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -34,7 +43,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'URL을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, url: row });
+    return NextResponse.json({ success: true, url: sanitizeUrlRow(row) });
   } catch (error) {
     console.error('Get URL error:', error);
     return NextResponse.json({ success: false, message: '오류가 발생했습니다.' }, { status: 500 });
@@ -72,7 +81,9 @@ export async function PATCH(request, { params }) {
 
     const { data: row, error: fetchErr } = await supabase
       .from('short_urls')
-      .select('id, code, original_url, created_at, visits, last_visit')
+      .select(
+        'id, code, original_url, created_at, visits, last_visit, link_password_hash, link_password_unlock_version'
+      )
       .eq('code', code)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -80,6 +91,36 @@ export async function PATCH(request, { params }) {
     if (fetchErr) throw fetchErr;
     if (!row) {
       return NextResponse.json({ success: false, message: 'URL을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    const updateFields = { original_url: orig, code: newCode };
+    const ver = Number(row.link_password_unlock_version) || 0;
+    const hasHash = !!(row.link_password_hash && String(row.link_password_hash).length > 0);
+
+    if (Object.prototype.hasOwnProperty.call(body, 'link_password_enabled')) {
+      const enabled = Boolean(body.link_password_enabled);
+      const pwd = typeof body.link_password === 'string' ? body.link_password.trim() : '';
+
+      if (!enabled) {
+        updateFields.link_password_hash = null;
+        updateFields.link_password_unlock_version = ver + 1;
+      } else {
+        if (pwd) {
+          if (pwd.length < 6) {
+            return NextResponse.json(
+              { success: false, message: '비밀번호는 6자 이상이어야 합니다.' },
+              { status: 400 }
+            );
+          }
+          updateFields.link_password_hash = await hashPassword(pwd);
+          updateFields.link_password_unlock_version = ver + 1;
+        } else if (!hasHash) {
+          return NextResponse.json(
+            { success: false, message: '비밀번호 보호를 켤 경우 비밀번호를 입력해주세요.' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     if (newCode !== row.code) {
@@ -98,10 +139,10 @@ export async function PATCH(request, { params }) {
 
     const { data: updated, error: updErr } = await supabase
       .from('short_urls')
-      .update({ original_url: orig, code: newCode })
+      .update(updateFields)
       .eq('id', row.id)
       .eq('user_id', user.id)
-      .select('id, code, original_url, created_at, visits, last_visit')
+      .select('id, code, original_url, created_at, visits, last_visit, link_password_hash')
       .single();
 
     if (updErr) {
@@ -115,7 +156,7 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({
       success: true,
       message: 'URL이 수정되었습니다.',
-      url: updated,
+      url: sanitizeUrlRow(updated),
     });
   } catch (error) {
     console.error('Patch URL error:', error);

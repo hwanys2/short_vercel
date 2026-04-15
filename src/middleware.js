@@ -5,6 +5,7 @@ import { normalizeShortPathSegment } from '@/lib/pathSegments';
 // 단축 코드는 [가-힣a-zA-Z0-9_-]+ 만 허용 → 점(.)이 들어간 경로는 예약(리다이렉트 루프 방지)
 const STATIC_PATHS = [
   '/missing.link',
+  '/link-gate',
   '/login',
   '/register',
   '/dashboard',

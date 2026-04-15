@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS short_urls (
   expiration_date TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '1 week'),
   visits INTEGER DEFAULT 0,
   last_visit TIMESTAMPTZ,
-  user_id BIGINT REFERENCES short_users(id) ON DELETE CASCADE
+  user_id BIGINT REFERENCES short_users(id) ON DELETE CASCADE,
+  -- 회원 단축 URL 비밀번호 보호 (NULL = 비활성)
+  link_password_hash TEXT,
+  link_password_unlock_version INTEGER NOT NULL DEFAULT 0
 );
 
 -- 인덱스
@@ -95,5 +98,9 @@ CREATE POLICY "Service can manage users" ON short_users FOR ALL USING (true);
 -- SELECT cron.schedule('cleanup-expired-urls', '0 * * * *', $$
 --   DELETE FROM short_urls WHERE expiration_date < NOW() AND user_id IS NULL;
 -- $$);
+
+-- 기존 DB에 컬럼만 추가할 때 (이미 테이블이 있는 경우)
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS link_password_hash TEXT;
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS link_password_unlock_version INTEGER NOT NULL DEFAULT 0;
 
 SELECT 'Supabase 테이블 생성 완료!';

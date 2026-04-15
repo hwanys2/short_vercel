@@ -17,6 +17,10 @@ export default function EditUrlPage() {
   const [saving, setSaving] = useState(false);
   const [originalUrl, setOriginalUrl] = useState('');
   const [customCode, setCustomCode] = useState('');
+  const [passwordEnabled, setPasswordEnabled] = useState(false);
+  const [hadPasswordProtection, setHadPasswordProtection] = useState(false);
+  const [linkPassword, setLinkPassword] = useState('');
+  const [confirmLinkPassword, setConfirmLinkPassword] = useState('');
   const [error, setError] = useState('');
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
@@ -50,6 +54,11 @@ export default function EditUrlPage() {
       }
       setOriginalUrl(data.url.original_url);
       setCustomCode(data.url.code);
+      const protectedNow = !!data.url.password_enabled;
+      setPasswordEnabled(protectedNow);
+      setHadPasswordProtection(protectedNow);
+      setLinkPassword('');
+      setConfirmLinkPassword('');
     } catch {
       setError('네트워크 오류가 발생했습니다.');
     } finally {
@@ -64,12 +73,38 @@ export default function EditUrlPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (passwordEnabled && linkPassword) {
+      if (linkPassword.length < 6) {
+        setError('링크 비밀번호는 6자 이상이어야 합니다.');
+        return;
+      }
+      if (linkPassword !== confirmLinkPassword) {
+        setError('비밀번호 확인이 일치하지 않습니다.');
+        return;
+      }
+    }
+
+    if (passwordEnabled && !linkPassword.trim() && !hadPasswordProtection) {
+      setError('비밀번호 보호를 켤 경우 비밀번호를 입력해주세요.');
+      return;
+    }
+
     setSaving(true);
     try {
+      const payload = {
+        original_url: originalUrl,
+        custom_code: customCode,
+        link_password_enabled: passwordEnabled,
+      };
+      if (passwordEnabled && linkPassword.trim()) {
+        payload.link_password = linkPassword.trim();
+      }
+
       const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ original_url: originalUrl, custom_code: customCode }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!data.success) {
@@ -141,6 +176,52 @@ export default function EditUrlPage() {
                       required
                     />
                   </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={passwordEnabled}
+                        onChange={(e) => {
+                          setPasswordEnabled(e.target.checked);
+                          if (!e.target.checked) {
+                            setLinkPassword('');
+                            setConfirmLinkPassword('');
+                          }
+                        }}
+                      />
+                      비밀번호로 보호 (단축 주소 방문 시 비밀번호 입력 후 이동)
+                    </label>
+                  </div>
+                  {passwordEnabled && (
+                    <>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="edit-link-password">
+                          링크 비밀번호{hadPasswordProtection ? ' (변경 시에만 입력)' : ''}
+                        </label>
+                        <input
+                          id="edit-link-password"
+                          type="password"
+                          className="form-input"
+                          autoComplete="new-password"
+                          placeholder={hadPasswordProtection ? '변경하지 않으려면 비워 두세요' : '6자 이상'}
+                          value={linkPassword}
+                          onChange={(e) => setLinkPassword(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="edit-link-password-confirm">비밀번호 확인</label>
+                        <input
+                          id="edit-link-password-confirm"
+                          type="password"
+                          className="form-input"
+                          autoComplete="new-password"
+                          placeholder="비밀번호를 다시 입력하세요"
+                          value={confirmLinkPassword}
+                          onChange={(e) => setConfirmLinkPassword(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
                   <div className="form-group">
                     <label className="form-label" htmlFor="edit-code">단축 코드</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
