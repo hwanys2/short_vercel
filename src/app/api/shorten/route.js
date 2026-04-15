@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest } from '@/lib/auth';
+import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 
 export async function POST(request) {
@@ -104,6 +104,17 @@ export async function POST(request) {
       visits: 0,
     };
     if (userId) insertData.user_id = userId;
+
+    if (userId && body.link_password_enabled === true) {
+      const rawPwd = typeof body.link_password === 'string' ? body.link_password.trim() : '';
+      if (!rawPwd || rawPwd.length < 6) {
+        return NextResponse.json(
+          { status: 'error', message: '비밀번호 보호를 켤 경우 비밀번호는 6자 이상이어야 합니다.' },
+          { status: 400 }
+        );
+      }
+      insertData.link_password_hash = await hashPassword(rawPwd);
+    }
 
     const { data: inserted, error } = await supabase
       .from('short_urls')

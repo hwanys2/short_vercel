@@ -408,6 +408,103 @@ a:hover {
   font-weight: 600;
 }
 
+/* Home URL form: 회원 전용 비밀번호 보호 옵션 */
+.url-form-member-options {
+  margin-bottom: 20px;
+}
+
+.url-form-member-options-inner {
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  border-left: 3px solid rgba(75, 90, 228, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.url-form-password-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+}
+
+.url-form-password-toggle input[type='checkbox'] {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.url-form-password-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.url-form-password-toggle-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.url-form-password-toggle-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.url-form-password-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.28s ease,
+    margin-top 0.28s ease,
+    padding-top 0.28s ease,
+    border-color 0.2s ease;
+  opacity: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 1px solid transparent;
+}
+
+.url-form-password-reveal.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 16px;
+  padding-top: 18px;
+  border-top-color: var(--border);
+}
+
+.url-form-password-reveal > .url-form-password-fields {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.url-form-password-fields .url-form-password-field-group {
+  margin-bottom: 16px;
+}
+
+.url-form-password-fields .url-form-password-field-group:last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .url-form-password-reveal {
+    transition: none;
+  }
+}
+
 .btn-shorten {
   width: 100%;
   padding: 16px;

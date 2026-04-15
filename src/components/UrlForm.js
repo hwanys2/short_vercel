@@ -6,6 +6,9 @@ export default function UrlForm({ user, onResult }) {
   const [originalUrl, setOriginalUrl] = useState('');
   const [customCode, setCustomCode] = useState('');
   const [expireDuration, setExpireDuration] = useState('1week');
+  const [passwordProtect, setPasswordProtect] = useState(false);
+  const [linkPassword, setLinkPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -15,17 +18,37 @@ export default function UrlForm({ user, onResult }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (user && passwordProtect) {
+      if (!linkPassword.trim() || linkPassword.trim().length < 6) {
+        setError('링크 비밀번호는 6자 이상이어야 합니다.');
+        return;
+      }
+      if (linkPassword !== confirmPassword) {
+        setError('비밀번호 확인이 일치하지 않습니다.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      const body = {
+        original_url: originalUrl,
+        custom_code: customCode,
+        expire_duration: expireDuration,
+      };
+      if (user) {
+        body.link_password_enabled = passwordProtect;
+        if (passwordProtect) {
+          body.link_password = linkPassword.trim();
+        }
+      }
+
       const res = await fetch('/api/shorten', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          original_url: originalUrl,
-          custom_code: customCode,
-          expire_duration: expireDuration,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -34,6 +57,9 @@ export default function UrlForm({ user, onResult }) {
         onResult(data.data);
         setOriginalUrl('');
         setCustomCode('');
+        setPasswordProtect(false);
+        setLinkPassword('');
+        setConfirmPassword('');
       } else {
         setError(data.message);
       }
@@ -77,6 +103,71 @@ export default function UrlForm({ user, onResult }) {
             />
           </div>
         </div>
+
+        {user && (
+          <div className="url-form-member-options">
+            <div className="url-form-member-options-inner">
+              <label className="url-form-password-toggle" htmlFor="home-link-password-enabled">
+                <input
+                  id="home-link-password-enabled"
+                  type="checkbox"
+                  checked={passwordProtect}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setPasswordProtect(on);
+                    if (!on) {
+                      setLinkPassword('');
+                      setConfirmPassword('');
+                    }
+                  }}
+                />
+                <span className="url-form-password-toggle-text">
+                  <span className="url-form-password-toggle-title">비밀번호로 보호</span>
+                  <span className="url-form-password-toggle-desc">
+                    단축 링크를 연 사람에게 비밀번호를 요청합니다
+                  </span>
+                </span>
+              </label>
+              <div
+                className={`url-form-password-reveal${passwordProtect ? ' is-open' : ''}`}
+                aria-hidden={!passwordProtect}
+              >
+                <div className="url-form-password-fields">
+                  <div className="form-group url-form-password-field-group">
+                    <label className="form-label" htmlFor="home-link-password">
+                      링크 비밀번호
+                    </label>
+                    <input
+                      id="home-link-password"
+                      type="password"
+                      className="form-input"
+                      autoComplete="new-password"
+                      placeholder="6자 이상"
+                      value={linkPassword}
+                      onChange={(e) => setLinkPassword(e.target.value)}
+                      disabled={!passwordProtect}
+                    />
+                  </div>
+                  <div className="form-group url-form-password-field-group">
+                    <label className="form-label" htmlFor="home-link-password-confirm">
+                      비밀번호 확인
+                    </label>
+                    <input
+                      id="home-link-password-confirm"
+                      type="password"
+                      className="form-input"
+                      autoComplete="new-password"
+                      placeholder="한 번 더 입력하세요"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={!passwordProtect}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {user ? (
           <div className="form-group" style={{ textAlign: 'center' }}>
