@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import UrlForm from '@/components/UrlForm';
@@ -11,6 +11,18 @@ export default function HomePageClient() {
   const [user, setUser] = useState(null);
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState({ total: 0, today: 0, users: 0 });
+  const resultAnchorRef = useRef(null);
+
+  useEffect(() => {
+    if (!result) return;
+    const id = requestAnimationFrame(() => {
+      resultAnchorRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [result]);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -44,14 +56,15 @@ export default function HomePageClient() {
         </section>
 
         <div className="container">
-          <UrlForm user={user} onResult={setResult} />
-        </div>
-
-        {result && (
-          <div className="container">
-            <UrlResult data={result} user={user} />
+          <div className="home-shorten-stack">
+            {result && (
+              <div ref={resultAnchorRef} className="home-shorten-result">
+                <UrlResult data={result} user={user} />
+              </div>
+            )}
+            <UrlForm user={user} onResult={setResult} />
           </div>
-        )}
+        </div>
 
         <div className="container">
           <DeveloperBooksTeaser />

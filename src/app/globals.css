@@ -252,6 +252,16 @@ a:hover {
   line-height: 1.7;
 }
 
+/* Home: 단축 결과를 폼 위에 두고 스크롤 앵커용 여백 (sticky 헤더) */
+.home-shorten-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-shorten-result {
+  scroll-margin-top: 88px;
+}
+
 /* ============ URL Form ============ */
 .url-form-container {
   max-width: 720px;
