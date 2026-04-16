@@ -34,8 +34,8 @@ export default function UrlResult({ data, user }) {
             value={data.short_url}
             size={160}
             level="M"
-            bgColor="#ffffff"
-            fgColor="#1a1a2e"
+            bgColor="var(--qr-bg)"
+            fgColor="var(--qr-fg)"
           />
         </div>
 

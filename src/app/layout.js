@@ -2,6 +2,7 @@ import './globals.css';
 import Script from 'next/script';
 import { getDefaultOgImageUrl } from '@/lib/ogImageUrl';
 import { getMetadataBase } from '@/lib/siteUrl';
+import { getThemeInitScript } from '@/lib/theme';
 
 const ADSENSE_CLIENT = 'ca-pub-8902099051011521';
 
@@ -36,9 +37,10 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <script id="theme-init" dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         {/* Google Analytics */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-F227R45H63" />
         <script
