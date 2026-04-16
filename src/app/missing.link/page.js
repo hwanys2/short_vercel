@@ -22,8 +22,8 @@ export default function MissingShortLinkPage() {
             단축 링크를 찾을 수 없습니다
           </h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', maxWidth: '440px' }}>
-            이 주소(<strong>/missing.link</strong>)는 단축 코드가 아니라, 잘못되었거나 만료된 단축
-            링크를 찾았을 때만 안내하기 위해 쓰는 페이지입니다. 데이터베이스 연결 오류가 아닙니다.
+            입력하신 단축 주소가 잘못되었거나 만료되었습니다. <strong>숏.한국</strong>은 한국어 주소도
+            만들 수 있는 단축주소 서비스입니다.
           </p>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', maxWidth: '440px' }}>
             원하시는 페이지로 가려면{' '}
