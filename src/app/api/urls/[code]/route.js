@@ -33,7 +33,7 @@ export async function GET(request, { params }) {
 
     const { data: row, error } = await supabase
       .from('short_urls')
-      .select('id, code, original_url, created_at, visits, last_visit, link_password_hash')
+      .select('id, code, original_url, created_at, visits, last_visit, link_password_hash, type, text_content')
       .eq('code', code)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -60,29 +60,16 @@ export async function PATCH(request, { params }) {
     const { code: rawCode } = await params;
     const code = decodeCodeParam(rawCode);
     const body = await request.json();
-    const { original_url, custom_code } = body;
+    const { original_url, custom_code, text_content } = body;
     const newCode = typeof custom_code === 'string' ? custom_code.trim() : '';
-    const orig = typeof original_url === 'string' ? original_url.trim() : '';
 
-    if (!orig) {
-      return NextResponse.json({ success: false, message: '원본 URL을 입력해주세요.' }, { status: 400 });
-    }
-    if (!newCode) {
-      return NextResponse.json({ success: false, message: '단축 코드를 입력해주세요.' }, { status: 400 });
-    }
-    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(newCode)) {
-      return NextResponse.json(
-        { success: false, message: '단축 코드는 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.' },
-        { status: 400 }
-      );
-    }
-
+    // 기존 row 조회 (type 포함)
     const supabase = getSupabaseAdmin();
 
     const { data: row, error: fetchErr } = await supabase
       .from('short_urls')
       .select(
-        'id, code, original_url, created_at, visits, last_visit, link_password_hash, link_password_unlock_version'
+        'id, code, original_url, created_at, visits, last_visit, link_password_hash, link_password_unlock_version, type, text_content'
       )
       .eq('code', code)
       .eq('user_id', user.id)
@@ -93,7 +80,49 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ success: false, message: 'URL을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    const updateFields = { original_url: orig, code: newCode };
+    const isTextType = (row.type || 'url') === 'text';
+
+    // 타입별 검증
+    if (isTextType) {
+      // 텍스트 타입: text_content 검증
+      if (text_content !== undefined) {
+        if (!text_content || typeof text_content !== 'string' || !text_content.trim()) {
+          return NextResponse.json({ success: false, message: '공유할 텍스트를 입력해주세요.' }, { status: 400 });
+        }
+        if (text_content.length > 50000) {
+          return NextResponse.json({ success: false, message: '텍스트는 50,000자까지 입력 가능합니다.' }, { status: 400 });
+        }
+      }
+    } else {
+      // URL 타입: original_url 검증
+      const orig = typeof original_url === 'string' ? original_url.trim() : '';
+      if (!orig) {
+        return NextResponse.json({ success: false, message: '원본 URL을 입력해주세요.' }, { status: 400 });
+      }
+    }
+
+    if (!newCode) {
+      return NextResponse.json({ success: false, message: '단축 코드를 입력해주세요.' }, { status: 400 });
+    }
+    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(newCode)) {
+      return NextResponse.json(
+        { success: false, message: '단축 코드는 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.' },
+        { status: 400 }
+      );
+    }
+
+    const updateFields = { code: newCode };
+
+    if (isTextType) {
+      // 텍스트 타입: text_content 업데이트
+      if (text_content !== undefined) {
+        updateFields.text_content = text_content;
+      }
+    } else {
+      // URL 타입: original_url 업데이트
+      updateFields.original_url = typeof original_url === 'string' ? original_url.trim() : row.original_url;
+    }
+
     const ver = Number(row.link_password_unlock_version) || 0;
     const hasHash = !!(row.link_password_hash && String(row.link_password_hash).length > 0);
 
@@ -153,9 +182,11 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ success: false, message: 'URL 수정 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
+    const successMessage = isTextType ? '텍스트가 수정되었습니다.' : 'URL이 수정되었습니다.';
+
     return NextResponse.json({
       success: true,
-      message: 'URL이 수정되었습니다.',
+      message: successMessage,
       url: sanitizeUrlRow(updated),
     });
   } catch (error) {

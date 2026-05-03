@@ -15,7 +15,9 @@ export default function EditUrlPage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingUrl, setLoadingUrl] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [urlType, setUrlType] = useState('url'); // 'url' | 'text'
   const [originalUrl, setOriginalUrl] = useState('');
+  const [textContent, setTextContent] = useState('');
   const [customCode, setCustomCode] = useState('');
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [hadPasswordProtection, setHadPasswordProtection] = useState(false);
@@ -49,10 +51,14 @@ export default function EditUrlPage() {
       if (!data.success) {
         setError(data.message || 'URL을 불러올 수 없습니다.');
         setOriginalUrl('');
+        setTextContent('');
         setCustomCode('');
         return;
       }
+      const type = data.url.type || 'url';
+      setUrlType(type);
       setOriginalUrl(data.url.original_url);
+      setTextContent(data.url.text_content || '');
       setCustomCode(data.url.code);
       const protectedNow = !!data.url.password_enabled;
       setPasswordEnabled(protectedNow);
@@ -93,10 +99,16 @@ export default function EditUrlPage() {
     setSaving(true);
     try {
       const payload = {
-        original_url: originalUrl,
         custom_code: customCode,
         link_password_enabled: passwordEnabled,
       };
+
+      if (urlType === 'text') {
+        payload.text_content = textContent;
+      } else {
+        payload.original_url = originalUrl;
+      }
+
       if (passwordEnabled && linkPassword.trim()) {
         payload.link_password = linkPassword.trim();
       }
@@ -111,7 +123,7 @@ export default function EditUrlPage() {
         setError(data.message || '수정에 실패했습니다.');
         return;
       }
-      alert(data.message || 'URL이 수정되었습니다.');
+      alert(data.message || '수정되었습니다.');
       router.replace('/dashboard');
     } catch {
       setError('네트워크 오류가 발생했습니다.');
@@ -134,13 +146,17 @@ export default function EditUrlPage() {
     );
   }
 
+  const isText = urlType === 'text';
+  const pageTitle = isText ? '텍스트 수정' : 'URL 수정';
+  const cardTitle = isText ? '📋 텍스트 편집' : '✏️ 단축 URL 편집';
+
   return (
     <>
       <Header />
       <main className="dashboard-page">
         <div className="container">
           <div className="dashboard-header">
-            <h1>URL 수정</h1>
+            <h1>{pageTitle}</h1>
             <div className="user-badge">
               단축 주소: {baseUrl}
               {user.username}/코드
@@ -149,7 +165,7 @@ export default function EditUrlPage() {
 
           <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
             <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-              <span>✏️ 단축 URL 편집</span>
+              <span>{cardTitle}</span>
               <Link href="/dashboard" className="btn btn-secondary btn-sm">
                 대시보드로
               </Link>
@@ -159,23 +175,50 @@ export default function EditUrlPage() {
                 <div style={{ textAlign: 'center', padding: '32px' }}>
                   <span className="spinner" style={{ borderTopColor: 'var(--primary)' }} />
                 </div>
-              ) : error && !originalUrl && !customCode ? (
+              ) : error && !customCode ? (
                 <div className="alert alert-danger">⚠️ {error}</div>
               ) : (
                 <form onSubmit={handleSubmit}>
                   {error && <div className="alert alert-danger" style={{ marginBottom: '16px' }}>⚠️ {error}</div>}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="edit-original">원본 URL</label>
-                    <input
-                      id="edit-original"
-                      type="url"
-                      className="form-input"
-                      placeholder="https://example.com"
-                      value={originalUrl}
-                      onChange={(e) => setOriginalUrl(e.target.value)}
-                      required
-                    />
-                  </div>
+
+                  {/* URL 타입: 원본 URL 입력 */}
+                  {!isText && (
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-original">원본 URL</label>
+                      <input
+                        id="edit-original"
+                        type="url"
+                        className="form-input"
+                        placeholder="https://example.com"
+                        value={originalUrl}
+                        onChange={(e) => setOriginalUrl(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {/* 텍스트 타입: 텍스트 내용 입력 */}
+                  {isText && (
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-text-content">텍스트 내용</label>
+                      <textarea
+                        id="edit-text-content"
+                        className="form-input form-textarea"
+                        placeholder="공유할 텍스트를 입력하세요"
+                        value={textContent}
+                        onChange={(e) => setTextContent(e.target.value)}
+                        required
+                        rows={8}
+                        maxLength={50000}
+                      />
+                      {textContent.length > 0 && (
+                        <div className="form-textarea-counter">
+                          {textContent.length.toLocaleString()} / 50,000자
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="form-group">
                     <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <input
