@@ -3,16 +3,47 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 
+const MAX_TEXT_LENGTH = 50000;
+
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { original_url, custom_code, expire_duration = '1week' } = body;
+    const {
+      custom_code,
+      expire_duration = '1week',
+      type = 'url',
+    } = body;
 
-    if (!original_url) {
+    // 타입 검증
+    if (type !== 'url' && type !== 'text') {
       return NextResponse.json(
-        { status: 'error', message: '원본 URL은 필수 파라미터입니다.' },
+        { status: 'error', message: '유효하지 않은 타입입니다.' },
         { status: 400 }
       );
+    }
+
+    // 타입별 필수 입력 검증
+    if (type === 'url') {
+      if (!body.original_url) {
+        return NextResponse.json(
+          { status: 'error', message: '원본 URL은 필수 파라미터입니다.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // text mode
+      if (!body.text_content || body.text_content.trim() === '') {
+        return NextResponse.json(
+          { status: 'error', message: '공유할 텍스트를 입력해주세요.' },
+          { status: 400 }
+        );
+      }
+      if (body.text_content.length > MAX_TEXT_LENGTH) {
+        return NextResponse.json(
+          { status: 'error', message: `텍스트는 ${MAX_TEXT_LENGTH.toLocaleString()}자까지 입력 가능합니다.` },
+          { status: 400 }
+        );
+      }
     }
 
     if (!custom_code || custom_code.trim() === '') {
@@ -32,13 +63,15 @@ export async function POST(request) {
       );
     }
 
-    // URL 유효성 검사
-    const isValidUrl = isUrlValid(original_url);
-    if (!isValidUrl) {
-      return NextResponse.json(
-        { status: 'error', message: '유효한 URL을 입력해주세요.' },
-        { status: 400 }
-      );
+    // URL 유효성 검사 (URL 모드만)
+    if (type === 'url') {
+      const isValidUrl = isUrlValid(body.original_url);
+      if (!isValidUrl) {
+        return NextResponse.json(
+          { status: 'error', message: '유효한 URL을 입력해주세요.' },
+          { status: 400 }
+        );
+      }
     }
 
     // 현재 사용자 확인
@@ -96,13 +129,19 @@ export async function POST(request) {
       expirationDate = new Date(Date.now() + duration).toISOString();
     }
 
-    // URL 삽입
+    // 데이터 삽입
     const insertData = {
-      original_url,
+      original_url: type === 'url' ? body.original_url : '__text__',
       code,
       expiration_date: expirationDate,
       visits: 0,
+      type,
     };
+
+    if (type === 'text') {
+      insertData.text_content = body.text_content;
+    }
+
     if (userId) insertData.user_id = userId;
 
     if (userId && body.link_password_enabled === true) {
@@ -125,7 +164,7 @@ export async function POST(request) {
     if (error) {
       console.error('URL insert error:', error);
       return NextResponse.json(
-        { status: 'error', message: 'URL 단축 중 오류가 발생했습니다.' },
+        { status: 'error', message: '단축 주소 생성 중 오류가 발생했습니다.' },
         { status: 500 }
       );
     }
@@ -135,15 +174,20 @@ export async function POST(request) {
       ? `${baseUrl}${user.username}/${code}`
       : `${baseUrl}${code}`;
 
+    const successMessage = type === 'text'
+      ? '텍스트 공유 주소가 성공적으로 만들어졌습니다.'
+      : 'URL이 성공적으로 단축되었습니다.';
+
     return NextResponse.json(
       {
         status: 'success',
-        message: 'URL이 성공적으로 단축되었습니다.',
+        message: successMessage,
         data: {
           short_url: shortUrl,
-          original_url,
+          original_url: type === 'url' ? body.original_url : null,
           code,
           expiration_date: expirationDate,
+          type,
         },
       },
       { status: 201 }
@@ -151,7 +195,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Shorten error:', error);
     return NextResponse.json(
-      { status: 'error', message: 'URL 단축 중 서버 오류가 발생했습니다.' },
+      { status: 'error', message: '단축 주소 생성 중 서버 오류가 발생했습니다.' },
       { status: 500 }
     );
   }

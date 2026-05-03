@@ -51,7 +51,7 @@ export default function HomePageClient() {
               <br />
               짧은 URL
             </h1>
-            <p className="hero-subtitle">긴 URL을 한글로 된 짧은 주소로 변환해보세요.</p>
+            <p className="hero-subtitle">긴 URL을 짧게, 텍스트를 간편하게 공유하세요.</p>
           </div>
         </section>
 

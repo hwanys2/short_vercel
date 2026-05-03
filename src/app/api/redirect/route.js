@@ -22,6 +22,7 @@ export async function GET(request) {
     const supabase = getSupabaseAdmin();
 
     let originalUrl = null;
+    let urlType = 'url';
 
     if (username) {
       // 회원 URL 패턴: /username/code
@@ -37,7 +38,7 @@ export async function GET(request) {
 
       const { data: urlData } = await supabase
         .from('short_urls')
-        .select('original_url, id, link_password_hash, link_password_unlock_version')
+        .select('original_url, id, link_password_hash, link_password_unlock_version, type, text_content')
         .eq('code', code)
         .eq('user_id', user.id)
         .single();
@@ -50,6 +51,7 @@ export async function GET(request) {
         if (protectedLink) {
           if (isValidLinkUnlockCookie(request, username, code, unlockVersion)) {
             originalUrl = urlData.original_url;
+            urlType = urlData.type || 'url';
             supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
           } else {
             const gate = new URL('/link-gate', request.url);
@@ -59,6 +61,7 @@ export async function GET(request) {
           }
         } else {
           originalUrl = urlData.original_url;
+          urlType = urlData.type || 'url';
           supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
         }
       }
@@ -66,7 +69,7 @@ export async function GET(request) {
       // 비회원 URL 패턴: /code (만료되지 않은 것만)
       const { data: urlData } = await supabase
         .from('short_urls')
-        .select('original_url, id, expiration_date')
+        .select('original_url, id, expiration_date, type, text_content')
         .eq('code', code)
         .gt('expiration_date', new Date().toISOString())
         .order('user_id', { ascending: true, nullsFirst: true })
@@ -75,11 +78,22 @@ export async function GET(request) {
 
       if (urlData) {
         originalUrl = urlData.original_url;
+        urlType = urlData.type || 'url';
         supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
       }
     }
 
     if (originalUrl) {
+      // 텍스트 타입이면 텍스트 뷰어 페이지로 리다이렉트
+      if (urlType === 'text') {
+        const textViewUrl = new URL('/text-view', request.url);
+        textViewUrl.searchParams.set('code', code);
+        if (username) {
+          textViewUrl.searchParams.set('username', username);
+        }
+        return NextResponse.redirect(textViewUrl, 302);
+      }
+
       return NextResponse.redirect(originalUrl, 302);
     }
 

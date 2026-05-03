@@ -103,4 +103,8 @@ CREATE POLICY "Service can manage users" ON short_users FOR ALL USING (true);
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS link_password_hash TEXT;
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS link_password_unlock_version INTEGER NOT NULL DEFAULT 0;
 
+-- 텍스트 메모 공유 기능 지원
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS type VARCHAR(10) NOT NULL DEFAULT 'url';
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS text_content TEXT;
+
 SELECT 'Supabase 테이블 생성 완료!';

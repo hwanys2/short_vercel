@@ -98,8 +98,8 @@ export default function UrlResult({ data, user }) {
   return (
     <div className="result-container">
       <div className="result-header">
-        <div className="result-icon">✅</div>
-        <h3>URL이 성공적으로 단축되었습니다!</h3>
+        <div className="result-icon">{data.type === 'text' ? '📋' : '✅'}</div>
+        <h3>{data.type === 'text' ? '텍스트 공유 주소가 만들어졌습니다!' : 'URL이 성공적으로 단축되었습니다!'}</h3>
       </div>
 
       <div className="result-content">

@@ -27,16 +27,18 @@ export async function GET(request) {
     // URL 목록
     const { data: urls, error } = await supabase
       .from('short_urls')
-      .select('code, original_url, created_at, visits, last_visit, link_password_hash')
+      .select('code, original_url, created_at, visits, last_visit, link_password_hash, type, text_content')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + perPage - 1);
 
     if (error) throw error;
 
-    const safeUrls = (urls || []).map(({ link_password_hash, ...u }) => ({
+    const safeUrls = (urls || []).map(({ link_password_hash, text_content, ...u }) => ({
       ...u,
       password_enabled: !!link_password_hash,
+      type: u.type || 'url',
+      text_preview: u.type === 'text' && text_content ? text_content.slice(0, 80) : null,
     }));
 
     return NextResponse.json({
@@ -62,10 +64,10 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { original_url, custom_code } = body;
+    const { original_url, custom_code, type = 'url', text_content } = body;
     const code = custom_code?.trim();
 
-    if (!code || !original_url) {
+    if (!code || (type === 'url' && !original_url) || (type === 'text' && (!text_content || !text_content.trim()))) {
       return NextResponse.json({ success: false, message: '필수 항목을 입력해주세요.' }, { status: 400 });
     }
 
@@ -96,13 +98,19 @@ export async function POST(request) {
     // 100년 만료
     const expirationDate = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { error } = await supabase.from('short_urls').insert({
-      original_url,
+    const insertData = {
+      original_url: type === 'url' ? original_url : '__text__',
       code,
       user_id: user.id,
       expiration_date: expirationDate,
       visits: 0,
-    });
+      type,
+    };
+    if (type === 'text') {
+      insertData.text_content = text_content;
+    }
+
+    const { error } = await supabase.from('short_urls').insert(insertData);
 
     if (error) {
       console.error('URL create error:', error);

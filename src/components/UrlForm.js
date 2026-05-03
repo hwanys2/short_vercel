@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 export default function UrlForm({ user, onResult }) {
+  const [mode, setMode] = useState('url'); // 'url' | 'text'
   const [originalUrl, setOriginalUrl] = useState('');
+  const [textContent, setTextContent] = useState('');
   const [customCode, setCustomCode] = useState('');
   const [expireDuration, setExpireDuration] = useState('1week');
   const [passwordProtect, setPasswordProtect] = useState(false);
@@ -34,10 +36,17 @@ export default function UrlForm({ user, onResult }) {
 
     try {
       const body = {
-        original_url: originalUrl,
         custom_code: customCode,
         expire_duration: expireDuration,
+        type: mode,
       };
+
+      if (mode === 'url') {
+        body.original_url = originalUrl;
+      } else {
+        body.text_content = textContent;
+      }
+
       if (user) {
         body.link_password_enabled = passwordProtect;
         if (passwordProtect) {
@@ -56,6 +65,7 @@ export default function UrlForm({ user, onResult }) {
       if (data.status === 'success') {
         onResult(data.data);
         setOriginalUrl('');
+        setTextContent('');
         setCustomCode('');
         setPasswordProtect(false);
         setLinkPassword('');
@@ -70,20 +80,74 @@ export default function UrlForm({ user, onResult }) {
     }
   };
 
+  const handleModeChange = (newMode) => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    setError('');
+  };
+
   return (
     <div className="url-form-container">
       <form onSubmit={handleSubmit}>
+        {/* Mode Tabs */}
+        <div className="mode-tabs" role="tablist" aria-label="입력 모드 선택">
+          <button
+            type="button"
+            role="tab"
+            className={`mode-tab ${mode === 'url' ? 'is-active' : ''}`}
+            aria-selected={mode === 'url'}
+            onClick={() => handleModeChange('url')}
+          >
+            <span className="mode-tab-icon">🔗</span>
+            URL 단축
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={`mode-tab ${mode === 'text' ? 'is-active' : ''}`}
+            aria-selected={mode === 'text'}
+            onClick={() => handleModeChange('text')}
+          >
+            <span className="mode-tab-icon">📋</span>
+            텍스트 공유
+          </button>
+        </div>
+
+        {/* URL Input / Text Input */}
         <div className="form-group">
-          <label className="form-label" htmlFor="original-url">원본 URL</label>
-          <input
-            id="original-url"
-            type="url"
-            className="form-input"
-            placeholder="https://example.com/very-long-url-here"
-            value={originalUrl}
-            onChange={(e) => setOriginalUrl(e.target.value)}
-            required
-          />
+          {mode === 'url' ? (
+            <>
+              <label className="form-label" htmlFor="original-url">원본 URL</label>
+              <input
+                id="original-url"
+                type="url"
+                className="form-input"
+                placeholder="https://example.com/very-long-url-here"
+                value={originalUrl}
+                onChange={(e) => setOriginalUrl(e.target.value)}
+                required
+              />
+            </>
+          ) : (
+            <>
+              <label className="form-label" htmlFor="text-content">공유할 텍스트</label>
+              <textarea
+                id="text-content"
+                className="form-input form-textarea"
+                placeholder="프롬프트, 코드, 메시지 등 공유할 텍스트를 입력하세요"
+                value={textContent}
+                onChange={(e) => setTextContent(e.target.value)}
+                required
+                rows={5}
+                maxLength={50000}
+              />
+              {textContent.length > 0 && (
+                <div className="form-textarea-counter">
+                  {textContent.length.toLocaleString()} / 50,000자
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <div className="form-group">
@@ -172,7 +236,7 @@ export default function UrlForm({ user, onResult }) {
         {user ? (
           <div className="form-group" style={{ textAlign: 'center' }}>
             <div className="member-badge">
-              ✨ 회원 URL은 영구적으로 유지됩니다
+              ✨ 회원 {mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다
             </div>
           </div>
         ) : (
@@ -206,8 +270,10 @@ export default function UrlForm({ user, onResult }) {
         <button type="submit" className="btn btn-primary btn-shorten" disabled={loading}>
           {loading ? (
             <><span className="spinner" /> 처리 중...</>
-          ) : (
+          ) : mode === 'url' ? (
             <>🔗 URL 단축하기</>
+          ) : (
+            <>📋 단축 주소 만들기</>
           )}
         </button>
         {!user && (

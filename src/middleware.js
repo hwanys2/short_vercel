@@ -6,6 +6,7 @@ import { normalizeShortPathSegment } from '@/lib/pathSegments';
 const STATIC_PATHS = [
   '/missing.link',
   '/link-gate',
+  '/text-view',
   '/login',
   '/register',
   '/dashboard',

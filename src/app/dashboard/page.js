@@ -19,6 +19,8 @@ export default function DashboardPage() {
   // 새 URL 생성 폼
   const [newUrl, setNewUrl] = useState('');
   const [newCode, setNewCode] = useState('');
+  const [newMode, setNewMode] = useState('url');
+  const [newText, setNewText] = useState('');
   const [creating, setCreating] = useState(false);
 
   // 회원탈퇴 모달
@@ -64,17 +66,27 @@ export default function DashboardPage() {
     setCreating(true);
     setMessage('');
     try {
+      const body = {
+        custom_code: newCode,
+        type: newMode,
+      };
+      if (newMode === 'url') {
+        body.original_url = newUrl;
+      } else {
+        body.text_content = newText;
+      }
       const res = await fetch('/api/urls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ original_url: newUrl, custom_code: newCode }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
-        setMessage('URL이 성공적으로 생성되었습니다.');
+        setMessage(newMode === 'text' ? '텍스트 공유 주소가 성공적으로 생성되었습니다.' : 'URL이 성공적으로 생성되었습니다.');
         setMessageType('success');
         setNewUrl('');
         setNewCode('');
+        setNewText('');
         fetchUrls();
       } else {
         setMessage(data.message);
@@ -159,13 +171,28 @@ export default function DashboardPage() {
 
           {/* 새 URL 생성 */}
           <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
-            <div className="card-header">➕ 새 URL 생성</div>
+            <div className="card-header">➕ 새 단축 주소 생성</div>
             <div className="card-body">
+              <div className="mode-tabs" role="tablist" style={{ marginBottom: '16px' }}>
+                <button type="button" role="tab" className={`mode-tab ${newMode === 'url' ? 'is-active' : ''}`} onClick={() => setNewMode('url')}>
+                  <span className="mode-tab-icon">🔗</span> URL 단축
+                </button>
+                <button type="button" role="tab" className={`mode-tab ${newMode === 'text' ? 'is-active' : ''}`} onClick={() => setNewMode('text')}>
+                  <span className="mode-tab-icon">📋</span> 텍스트 공유
+                </button>
+              </div>
               <form onSubmit={handleCreate} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
-                  <label className="form-label" htmlFor="dash-url">원본 URL</label>
-                  <input id="dash-url" type="url" className="form-input" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required />
-                </div>
+                {newMode === 'url' ? (
+                  <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="dash-url">원본 URL</label>
+                    <input id="dash-url" type="url" className="form-input" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required />
+                  </div>
+                ) : (
+                  <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="dash-text">공유할 텍스트</label>
+                    <textarea id="dash-text" className="form-input form-textarea" placeholder="프롬프트, 코드, 메시지 등" value={newText} onChange={(e) => setNewText(e.target.value)} required rows={3} maxLength={50000} />
+                  </div>
+                )}
                 <div className="form-group" style={{ flex: '1.5', minWidth: '180px', marginBottom: 0 }}>
                   <label className="form-label" htmlFor="dash-code">단축 코드</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -179,6 +206,7 @@ export default function DashboardPage() {
               </form>
             </div>
           </div>
+
 
           {/* URL 목록 */}
           <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
@@ -201,8 +229,9 @@ export default function DashboardPage() {
                   <table>
                     <thead>
                       <tr>
+                        <th>타입</th>
                         <th>단축 URL</th>
-                        <th>원본 URL</th>
+                        <th>내용</th>
                         <th>생성일</th>
                         <th>클릭수</th>
                         <th>작업</th>
@@ -211,12 +240,15 @@ export default function DashboardPage() {
                     <tbody>
                       {urls.map((url) => (
                         <tr key={url.code}>
+                          <td>{url.type === 'text' ? '📋' : '🔗'}</td>
                           <td>
                             <a href={`${baseUrl}${user.username}/${url.code}`} target="_blank" rel="noopener noreferrer">
                               {user.username}/{url.code}
                             </a>
                           </td>
-                          <td className="url-cell" title={url.original_url}>{url.original_url}</td>
+                          <td className="url-cell" title={url.type === 'text' ? (url.text_preview || '텍스트 메모') : url.original_url}>
+                            {url.type === 'text' ? (url.text_preview ? `${url.text_preview}...` : '텍스트 메모') : url.original_url}
+                          </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{new Date(url.created_at).toLocaleDateString('ko-KR')}</td>
                           <td>{url.visits}</td>
                           <td>
