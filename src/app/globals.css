@@ -358,6 +358,7 @@ a:hover {
 
 /* ============ URL Form ============ */
 .url-form-container {
+  width: 100%;
   max-width: 720px;
   margin: 0 auto 60px;
   background: var(--bg-card);
