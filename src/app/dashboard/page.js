@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildShortUrl } from '@/lib/siteUrl';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -145,7 +146,7 @@ export default function DashboardPage() {
   };
 
   const copyUrl = (code) => {
-    const url = `${baseUrl}${user.username}/${code}`;
+    const url = buildShortUrl({ baseUrl, code, username: user.username });
     navigator.clipboard.writeText(url).then(() => alert('URL이 복사되었습니다!'));
   };
 
@@ -242,7 +243,7 @@ export default function DashboardPage() {
                         <tr key={url.code}>
                           <td>{url.type === 'text' ? '📋' : '🔗'}</td>
                           <td>
-                            <a href={`${baseUrl}${user.username}/${url.code}`} target="_blank" rel="noopener noreferrer">
+                            <a href={buildShortUrl({ baseUrl, code: url.code, username: user.username })} target="_blank" rel="noopener noreferrer">
                               {user.username}/{url.code}
                             </a>
                           </td>

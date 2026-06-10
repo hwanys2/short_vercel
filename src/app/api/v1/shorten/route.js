@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { guestDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
+import { buildShortUrl } from '@/lib/siteUrl';
 
 export async function GET() {
   return NextResponse.json({
@@ -154,13 +155,12 @@ export async function POST(request) {
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
     return NextResponse.json(
       {
         status: 'success',
         message: 'URL이 성공적으로 단축되었습니다.',
         data: {
-          short_url: `${baseUrl}${customCode}`,
+          short_url: buildShortUrl({ code: customCode }),
           original_url: originalUrl,
           code: customCode,
           expiration_date: expirationDate,

@@ -1215,6 +1215,18 @@ a:hover {
   font-family: 'JetBrains Mono', monospace;
 }
 
+.short-url-mobile-hint {
+  margin: -8px 0 16px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.short-url-mobile-hint code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+}
+
 .result-actions {
   display: flex;
   gap: 12px;

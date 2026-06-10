@@ -58,7 +58,7 @@ export default function ApiDocsPage() {
   "status": "success",
   "message": "URL이 성공적으로 단축되었습니다.",
   "data": {
-    "short_url": "https://숏.한국/예제",
+    "short_url": "https://숏.한국/예제/",
     "original_url": "https://example.com/very-long-url",
     "code": "예제",
     "expiration_date": "2026-04-21T10:00:00.000Z"

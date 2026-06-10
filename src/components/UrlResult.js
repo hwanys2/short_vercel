@@ -149,6 +149,10 @@ export default function UrlResult({ data, user }) {
               📋 복사
             </button>
           </div>
+          <p className="short-url-mobile-hint">
+            모바일 주소창에 직접 입력할 때는 주소 끝에 <code>/</code>를 붙여 주세요.{' '}
+            <code>/</code> 없이 입력하면 구글 검색으로 연결될 수 있습니다.
+          </p>
           <div className="result-actions">
             <a href={data.short_url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
               🔗 링크 열기

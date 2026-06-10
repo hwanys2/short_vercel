@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { buildShortUrl } from '@/lib/siteUrl';
 
 export default function TextViewContent() {
   const searchParams = useSearchParams();
@@ -56,10 +57,7 @@ export default function TextViewContent() {
     }
   }, [textContent]);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
-  const shortUrl = username
-    ? `${baseUrl}${username}/${code}`
-    : `${baseUrl}${code}`;
+  const shortUrl = buildShortUrl({ code, username: username || undefined });
 
   const charCount = textContent.length;
   const lineCount = textContent ? textContent.split('\n').length : 0;

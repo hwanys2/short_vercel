@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
+import { buildShortUrl } from '@/lib/siteUrl';
 
 const MAX_TEXT_LENGTH = 50000;
 
@@ -169,10 +170,10 @@ export async function POST(request) {
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
-    const shortUrl = userId && user
-      ? `${baseUrl}${user.username}/${code}`
-      : `${baseUrl}${code}`;
+    const shortUrl = buildShortUrl({
+      code,
+      username: userId && user ? user.username : undefined,
+    });
 
     const successMessage = type === 'text'
       ? '텍스트 공유 주소가 성공적으로 만들어졌습니다.'
