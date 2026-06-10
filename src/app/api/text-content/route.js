@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
+import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -16,6 +17,7 @@ export async function GET(request) {
     const normalizedCode = normalizeShortPathSegment(code);
 
     let urlData = null;
+    let unlockUsername = '';
 
     if (username) {
       const normalizedUsername = normalizeShortPathSegment(username);
@@ -31,26 +33,38 @@ export async function GET(request) {
 
       const { data } = await supabase
         .from('short_urls')
-        .select('text_content, type, code')
+        .select('text_content, type, code, link_password_hash, link_password_unlock_version')
         .eq('code', normalizedCode)
         .eq('user_id', user.id)
         .single();
 
       urlData = data;
+      unlockUsername = normalizedUsername;
     } else {
       const { data } = await supabase
         .from('short_urls')
-        .select('text_content, type, code')
+        .select('text_content, type, code, link_password_hash, link_password_unlock_version')
         .eq('code', normalizedCode)
         .is('user_id', null)
         .gt('expiration_date', new Date().toISOString())
         .single();
 
       urlData = data;
+      unlockUsername = '';
     }
 
     if (!urlData || urlData.type !== 'text') {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    const protectedLink =
+      urlData.link_password_hash != null && String(urlData.link_password_hash).length > 0;
+
+    if (protectedLink) {
+      const unlockVersion = Number(urlData.link_password_unlock_version) || 0;
+      if (!isValidLinkUnlockCookie(request, unlockUsername, normalizedCode, unlockVersion)) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
     }
 
     return NextResponse.json({

@@ -19,25 +19,44 @@ export async function POST(request) {
   const username = usernameRaw ? normalizeShortPathSegment(usernameRaw) : '';
   const code = codeRaw ? normalizeShortPathSegment(codeRaw) : '';
 
-  if (!username || !code || !password) {
+  if (!code || !password) {
     return NextResponse.json({ success: false, message: '입력값을 확인해주세요.' }, { status: 400 });
   }
 
   try {
     const supabase = getSupabaseAdmin();
 
-    const { data: user } = await supabase.from('short_users').select('id').eq('username', username).single();
+    let urlData = null;
+    let unlockUsername = '';
 
-    if (!user) {
-      return NextResponse.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
+    if (username) {
+      const { data: user } = await supabase.from('short_users').select('id').eq('username', username).single();
+
+      if (!user) {
+        return NextResponse.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
+      }
+
+      const { data } = await supabase
+        .from('short_urls')
+        .select('id, link_password_hash, link_password_unlock_version')
+        .eq('code', code)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      urlData = data;
+      unlockUsername = username;
+    } else {
+      const { data } = await supabase
+        .from('short_urls')
+        .select('id, link_password_hash, link_password_unlock_version')
+        .eq('code', code)
+        .is('user_id', null)
+        .gt('expiration_date', new Date().toISOString())
+        .maybeSingle();
+
+      urlData = data;
+      unlockUsername = '';
     }
-
-    const { data: urlData } = await supabase
-      .from('short_urls')
-      .select('id, link_password_hash, link_password_unlock_version')
-      .eq('code', code)
-      .eq('user_id', user.id)
-      .maybeSingle();
 
     if (!urlData?.link_password_hash) {
       return NextResponse.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
@@ -50,7 +69,7 @@ export async function POST(request) {
 
     const version = Number(urlData.link_password_unlock_version) || 0;
     const response = NextResponse.json({ success: true });
-    setLinkUnlockCookieOnResponse(response, { username, code, version });
+    setLinkUnlockCookieOnResponse(response, { username: unlockUsername, code, version });
     return response;
   } catch (error) {
     console.error('Link unlock error:', error);

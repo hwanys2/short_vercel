@@ -29,7 +29,7 @@ export function decodeLinkUnlockToken(token) {
     const u = typeof decoded.u === 'string' ? decoded.u : '';
     const c = typeof decoded.c === 'string' ? decoded.c : '';
     const v = Number(decoded.v);
-    if (!u || !c || !Number.isFinite(v)) return null;
+    if (!c || !Number.isFinite(v)) return null;
     return { username: u, code: c, version: v };
   } catch {
     return null;

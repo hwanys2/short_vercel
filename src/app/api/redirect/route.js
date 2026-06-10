@@ -69,17 +69,32 @@ export async function GET(request) {
       // 비회원 URL 패턴: /code (만료되지 않은 것만)
       const { data: urlData } = await supabase
         .from('short_urls')
-        .select('original_url, id, expiration_date, type, text_content')
+        .select('original_url, id, expiration_date, type, text_content, link_password_hash, link_password_unlock_version')
         .eq('code', code)
+        .is('user_id', null)
         .gt('expiration_date', new Date().toISOString())
-        .order('user_id', { ascending: true, nullsFirst: true })
-        .limit(1)
-        .single();
+        .maybeSingle();
 
       if (urlData) {
-        originalUrl = urlData.original_url;
-        urlType = urlData.type || 'url';
-        supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+        const protectedLink =
+          urlData.link_password_hash != null && String(urlData.link_password_hash).length > 0;
+        const unlockVersion = Number(urlData.link_password_unlock_version) || 0;
+
+        if (protectedLink) {
+          if (isValidLinkUnlockCookie(request, '', code, unlockVersion)) {
+            originalUrl = urlData.original_url;
+            urlType = urlData.type || 'url';
+            supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+          } else {
+            const gate = new URL('/link-gate', request.url);
+            gate.searchParams.set('code', code);
+            return NextResponse.redirect(gate, 302);
+          }
+        } else {
+          originalUrl = urlData.original_url;
+          urlType = urlData.type || 'url';
+          supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+        }
       }
     }
 

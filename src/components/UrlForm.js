@@ -21,7 +21,7 @@ export default function UrlForm({ user, onResult }) {
     e.preventDefault();
     setError('');
 
-    if (user && passwordProtect) {
+    if (passwordProtect) {
       if (!linkPassword.trim() || linkPassword.trim().length < 6) {
         setError('링크 비밀번호는 6자 이상이어야 합니다.');
         return;
@@ -47,11 +47,9 @@ export default function UrlForm({ user, onResult }) {
         body.text_content = textContent;
       }
 
-      if (user) {
-        body.link_password_enabled = passwordProtect;
-        if (passwordProtect) {
-          body.link_password = linkPassword.trim();
-        }
+      body.link_password_enabled = passwordProtect;
+      if (passwordProtect) {
+        body.link_password = linkPassword.trim();
       }
 
       const res = await fetch('/api/shorten', {
@@ -168,10 +166,9 @@ export default function UrlForm({ user, onResult }) {
           </div>
         </div>
 
-        {user && (
-          <div className="url-form-member-options">
-            <div className="url-form-member-options-inner">
-              <label className="url-form-password-toggle" htmlFor="home-link-password-enabled">
+        <div className="url-form-member-options">
+          <div className="url-form-member-options-inner">
+            <label className="url-form-password-toggle" htmlFor="home-link-password-enabled">
                 <input
                   id="home-link-password-enabled"
                   type="checkbox"
@@ -229,9 +226,14 @@ export default function UrlForm({ user, onResult }) {
                   </div>
                 </div>
               </div>
-            </div>
+            {!user && passwordProtect && (
+              <p className="url-form-guest-password-note">
+                비밀번호는 링크 생성 시에만 설정할 수 있습니다. 이후 변경이 필요하면{' '}
+                <Link href="/register">회원가입</Link> 후 새 링크를 만들어주세요.
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
         {user ? (
           <div className="form-group" style={{ textAlign: 'center' }}>

@@ -145,7 +145,7 @@ export async function POST(request) {
 
     if (userId) insertData.user_id = userId;
 
-    if (userId && body.link_password_enabled === true) {
+    if (body.link_password_enabled === true) {
       const rawPwd = typeof body.link_password === 'string' ? body.link_password.trim() : '';
       if (!rawPwd || rawPwd.length < 6) {
         return NextResponse.json(
