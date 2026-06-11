@@ -3,9 +3,9 @@
 import { useEffect, useRef } from 'react';
 
 const AD_CLIENT = 'ca-pub-8902099051011521';
-const AD_SLOT = '5801358149';
+const DEFAULT_SLOT = '5801358149';
 
-export default function AdSenseSlot() {
+export default function AdSenseSlot({ slot = DEFAULT_SLOT, variant = 'footer' }) {
   const pushed = useRef(false);
 
   useEffect(() => {
@@ -18,14 +18,19 @@ export default function AdSenseSlot() {
     }
   }, []);
 
+  const regionClass =
+    variant === 'rail' ? 'ad-sense-region ad-sense-region--rail' : 'ad-sense-region';
+  const innerClass =
+    variant === 'rail' ? 'ad-sense-inner ad-sense-inner--rail' : 'ad-sense-inner';
+
   return (
-    <div className="ad-sense-region" aria-label="보조 콘텐츠">
-      <div className="ad-sense-inner">
+    <div className={regionClass} aria-label="보조 콘텐츠">
+      <div className={innerClass}>
         <ins
           className="adsbygoogle"
           style={{ display: 'block' }}
           data-ad-client={AD_CLIENT}
-          data-ad-slot={AD_SLOT}
+          data-ad-slot={slot}
           data-ad-format="auto"
           data-full-width-responsive="true"
         />

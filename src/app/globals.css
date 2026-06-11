@@ -356,6 +356,62 @@ a:hover {
   scroll-margin-top: 88px;
 }
 
+/* ============ Home desktop rails ============ */
+.home-wide-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'main'
+    'books'
+    'stats';
+}
+
+.home-layout-main {
+  grid-area: main;
+}
+
+.home-layout-books {
+  grid-area: books;
+}
+
+.home-layout-stats {
+  grid-area: stats;
+}
+
+@media (min-width: 1280px) {
+  .home-wide-layout {
+    grid-template-columns: minmax(140px, 180px) 720px minmax(180px, 220px);
+    grid-template-areas:
+      'ad main books'
+      'ad stats books';
+    justify-content: center;
+    column-gap: 40px;
+    margin: 0 auto;
+    padding: 0 24px;
+    align-items: start;
+  }
+
+  .home-layout-ad {
+    grid-area: ad;
+    position: sticky;
+    top: 88px;
+    align-self: start;
+  }
+
+  .home-layout-books.is-rail {
+    position: sticky;
+    top: 88px;
+    align-self: start;
+  }
+
+  .home-layout-main .container,
+  .home-layout-stats .container {
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 /* ============ URL Form ============ */
 .url-form-container {
   width: 100%;
@@ -1522,6 +1578,25 @@ tr:hover td {
   min-height: 90px;
 }
 
+.ad-sense-region--rail {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.ad-sense-inner--rail {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.ad-sense-inner--rail .adsbygoogle {
+  min-height: 250px;
+}
+
 @media (max-width: 768px) {
   .ad-sense-region {
     margin-top: 32px;
@@ -1746,6 +1821,49 @@ tr:hover td {
 
 .developer-books-teaser-cta {
   text-decoration: none;
+}
+
+.developer-books-teaser--rail {
+  margin: 0;
+  max-width: 220px;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-lead {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: center;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-card {
+  padding: 16px 14px;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-inner {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-cover {
+  width: 100%;
+  max-width: 140px;
+  max-height: none;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-meta {
+  align-items: center;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-title {
+  font-size: 0.95rem;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-actions {
+  justify-content: center;
 }
 
 @media (max-width: 560px) {

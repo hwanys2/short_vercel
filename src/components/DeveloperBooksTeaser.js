@@ -5,7 +5,13 @@ import { DEVELOPER_BOOKS } from '@/data/developerBooks';
 
 const ROTATE_MS = 10_000;
 
-export default function DeveloperBooksTeaser() {
+const LEAD_INLINE =
+  '숏한국 개발 교사의 책입니다. 책 구입은 서버 운영에 큰 힘이 됩니다.';
+const LEAD_RAIL =
+  '숏.한국을 만든 개발 교사가 집필한 책이에요. 편하실 때 한번 둘러봐 주세요.';
+
+export default function DeveloperBooksTeaser({ layout = 'inline' }) {
+  const isRail = layout === 'rail';
   const [index, setIndex] = useState(() => Math.floor(Math.random() * DEVELOPER_BOOKS.length));
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -18,12 +24,12 @@ export default function DeveloperBooksTeaser() {
   }, []);
 
   useEffect(() => {
-    if (reduceMotion) return undefined;
+    if (reduceMotion || isRail) return undefined;
     const id = window.setInterval(() => {
       setIndex((i) => (i + 1) % DEVELOPER_BOOKS.length);
     }, ROTATE_MS);
     return () => window.clearInterval(id);
-  }, [reduceMotion]);
+  }, [reduceMotion, isRail]);
 
   const book = DEVELOPER_BOOKS[index];
 
@@ -31,15 +37,21 @@ export default function DeveloperBooksTeaser() {
     setIndex((i) => (i + 1) % DEVELOPER_BOOKS.length);
   }, []);
 
+  const teaserClass = isRail
+    ? 'developer-books-teaser developer-books-teaser--rail'
+    : 'developer-books-teaser';
+
   return (
-    <aside className="developer-books-teaser" aria-label="개발자 소개 및 도서">
-      <p className="developer-books-teaser-lead">
-        숏한국 개발 교사의 책입니다. 책 구입은 서버 운영에 큰 힘이 됩니다.
-      </p>
+    <aside className={teaserClass} aria-label="개발자 소개 및 도서">
+      <p className="developer-books-teaser-lead">{isRail ? LEAD_RAIL : LEAD_INLINE}</p>
       <div className="developer-books-teaser-card">
         <div
           key={book.id}
-          className={reduceMotion ? 'developer-books-teaser-inner' : 'developer-books-teaser-inner developer-books-teaser-inner--animate'}
+          className={
+            reduceMotion
+              ? 'developer-books-teaser-inner'
+              : 'developer-books-teaser-inner developer-books-teaser-inner--animate'
+          }
           aria-live="polite"
         >
           <a

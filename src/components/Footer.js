@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import AdSenseSlot from '@/components/AdSenseSlot';
 
-export default function Footer() {
+export default function Footer({ suppressAdSense = false }) {
   return (
     <>
-      <AdSenseSlot />
+      {!suppressAdSense && <AdSenseSlot />}
       <footer className="site-footer">
       <div className="container">
         <div className="footer-grid">

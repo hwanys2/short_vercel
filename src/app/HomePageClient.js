@@ -6,12 +6,17 @@ import Footer from '@/components/Footer';
 import UrlForm from '@/components/UrlForm';
 import UrlResult from '@/components/UrlResult';
 import DeveloperBooksTeaser from '@/components/DeveloperBooksTeaser';
+import AdSenseSlot from '@/components/AdSenseSlot';
+import { useMediaQuery } from '@/lib/useMediaQuery';
+
+const HOME_RAIL_AD_SLOT = '3012878973';
 
 export default function HomePageClient() {
   const [user, setUser] = useState(null);
   const [result, setResult] = useState(null);
   const [stats, setStats] = useState({ total: 0, today: 0, users: 0 });
   const resultAnchorRef = useRef(null);
+  const isWide = useMediaQuery('(min-width: 1280px)');
 
   useEffect(() => {
     if (!result) return;
@@ -55,45 +60,59 @@ export default function HomePageClient() {
           </div>
         </section>
 
-        <div className="container">
-          <div className="home-shorten-stack">
-            {result && (
-              <div ref={resultAnchorRef} className="home-shorten-result">
-                <UrlResult data={result} user={user} />
+        <div className="home-wide-layout">
+          {isWide && (
+            <aside className="home-layout-ad">
+              <AdSenseSlot slot={HOME_RAIL_AD_SLOT} variant="rail" />
+            </aside>
+          )}
+
+          <div className="home-layout-main">
+            <div className="container">
+              <div className="home-shorten-stack">
+                {result && (
+                  <div ref={resultAnchorRef} className="home-shorten-result">
+                    <UrlResult data={result} user={user} />
+                  </div>
+                )}
+                <UrlForm user={user} onResult={setResult} />
               </div>
-            )}
-            <UrlForm user={user} onResult={setResult} />
+            </div>
           </div>
-        </div>
 
-        <div className="container">
-          <DeveloperBooksTeaser />
-        </div>
+          <aside className={`home-layout-books${isWide ? ' is-rail' : ' is-inline'}`}>
+            <div className={isWide ? undefined : 'container'}>
+              <DeveloperBooksTeaser layout={isWide ? 'rail' : 'inline'} />
+            </div>
+          </aside>
 
-        <div className="container">
-          <div className="stats-row">
-            <div className="stat-card">
-              <div className="stat-number">
-                <AnimatedNumber value={stats.total} />
+          <div className="home-layout-stats">
+            <div className="container">
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-number">
+                    <AnimatedNumber value={stats.total} />
+                  </div>
+                  <div className="stat-label">현재 활성 URL</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-number">
+                    <AnimatedNumber value={stats.today} />
+                  </div>
+                  <div className="stat-label">오늘 생성</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-number">
+                    <AnimatedNumber value={stats.users} />
+                  </div>
+                  <div className="stat-label">회원 수</div>
+                </div>
               </div>
-              <div className="stat-label">현재 활성 URL</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">
-                <AnimatedNumber value={stats.today} />
-              </div>
-              <div className="stat-label">오늘 생성</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">
-                <AnimatedNumber value={stats.users} />
-              </div>
-              <div className="stat-label">회원 수</div>
             </div>
           </div>
         </div>
       </main>
-      <Footer />
+      <Footer suppressAdSense={isWide} />
     </>
   );
 }
