@@ -1828,17 +1828,21 @@ tr:hover td {
   max-width: 220px;
 }
 
-.developer-books-teaser--rail .developer-books-teaser-lead {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-weight: 400;
-  text-align: center;
-  margin-bottom: 14px;
-  line-height: 1.5;
-}
-
 .developer-books-teaser--rail .developer-books-teaser-card {
   padding: 16px 14px;
+}
+
+.developer-books-teaser-lead--rail {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-align: center;
+  margin: 0 0 16px;
+  padding-bottom: 14px;
+  line-height: 1.55;
+  border-bottom: 1px solid var(--border-light);
+  max-width: none;
 }
 
 .developer-books-teaser--rail .developer-books-teaser-inner {

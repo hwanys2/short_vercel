@@ -43,8 +43,11 @@ export default function DeveloperBooksTeaser({ layout = 'inline' }) {
 
   return (
     <aside className={teaserClass} aria-label="개발자 소개 및 도서">
-      <p className="developer-books-teaser-lead">{isRail ? LEAD_RAIL : LEAD_INLINE}</p>
+      {!isRail && <p className="developer-books-teaser-lead">{LEAD_INLINE}</p>}
       <div className="developer-books-teaser-card">
+        {isRail && (
+          <p className="developer-books-teaser-lead developer-books-teaser-lead--rail">{LEAD_RAIL}</p>
+        )}
         <div
           key={book.id}
           className={
