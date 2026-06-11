@@ -402,6 +402,8 @@ a:hover {
     position: sticky;
     top: 88px;
     align-self: start;
+    display: flex;
+    justify-content: center;
   }
 
   .home-layout-main .container,
@@ -1824,12 +1826,14 @@ tr:hover td {
 }
 
 .developer-books-teaser--rail {
-  margin: 0;
+  margin: 0 auto;
   max-width: 220px;
+  width: 100%;
 }
 
 .developer-books-teaser--rail .developer-books-teaser-card {
   padding: 16px 14px;
+  text-align: center;
 }
 
 .developer-books-teaser-lead--rail {
@@ -1850,16 +1854,31 @@ tr:hover td {
   align-items: center;
   text-align: center;
   gap: 14px;
+  width: 100%;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-cover-link {
+  align-self: center;
+  margin: 0 auto;
 }
 
 .developer-books-teaser--rail .developer-books-teaser-cover {
   width: 100%;
   max-width: 140px;
   max-height: none;
+  margin: 0 auto;
 }
 
 .developer-books-teaser--rail .developer-books-teaser-meta {
   align-items: center;
+  width: 100%;
+  text-align: center;
+}
+
+.developer-books-teaser--rail .developer-books-teaser-label,
+.developer-books-teaser--rail .developer-books-teaser-title {
+  text-align: center;
+  width: 100%;
 }
 
 .developer-books-teaser--rail .developer-books-teaser-title {
