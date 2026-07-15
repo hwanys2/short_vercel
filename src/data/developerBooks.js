@@ -18,6 +18,12 @@ export const DEVELOPER_BOOKS = [
     coverImageUrl: 'https://image.yes24.com/goods/145423321/XL',
   },
   {
+    id: 'math-joy-m2',
+    title: '수학하는 즐거움 중2',
+    purchaseUrl: 'https://www.yes24.com/product/goods/193602856',
+    coverImageUrl: 'https://image.yes24.com/goods/193602856/XL',
+  },
+  {
     id: 'math-9min',
     title: '1일 1주제 9분 만에 끝내는 수학',
     purchaseUrl: 'https://www.yes24.com/product/goods/168192700',
