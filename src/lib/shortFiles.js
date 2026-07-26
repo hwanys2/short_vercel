@@ -93,14 +93,20 @@ const BLOCKED_EXTENSIONS = new Set([
 ]);
 
 export function getFileExtension(filename) {
-  const base = String(filename || '').split(/[/\\]/).pop() || '';
+  const base = String(filename || '').normalize('NFC').split(/[/\\]/).pop() || '';
   const parts = base.split('.');
   if (parts.length < 2) return '';
   return parts.pop().toLowerCase();
 }
 
+export function normalizeDisplayFileName(filename) {
+  const raw = String(filename || 'file').normalize('NFC').split(/[/\\]/).pop() || 'file';
+  const cleaned = raw.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 255);
+  return cleaned || 'file';
+}
+
 export function sanitizeFileName(filename) {
-  const raw = String(filename || 'file').split(/[/\\]/).pop() || 'file';
+  const raw = normalizeDisplayFileName(filename);
   const cleaned = raw
     .replace(/[^\w.\-가-힣()[\] ]+/g, '_')
     .replace(/\s+/g, ' ')
@@ -169,7 +175,7 @@ export function validateUploadFile(file) {
   return {
     ok: true,
     mime: mimeResult.mime,
-    fileName: sanitizeFileName(file.name),
+    fileName: normalizeDisplayFileName(file.name),
     fileSize: file.size,
   };
 }
