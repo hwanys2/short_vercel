@@ -61,9 +61,16 @@ export default function Header() {
     <header className="site-header">
       <div className="container">
         <div className="header-inner">
-          <Link href="/" className="logo">
+          <a
+            href="/"
+            className="logo"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.assign('/');
+            }}
+          >
             숏.한국
-          </Link>
+          </a>
           <nav className="nav-links">
             <div className="theme-switcher" role="group" aria-label="테마 선택">
               <button
