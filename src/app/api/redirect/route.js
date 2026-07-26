@@ -109,6 +109,16 @@ export async function GET(request) {
         return NextResponse.redirect(textViewUrl, 302);
       }
 
+      // 파일 타입이면 다운로드 페이지로 리다이렉트
+      if (urlType === 'file') {
+        const fileViewUrl = new URL('/file-view', request.url);
+        fileViewUrl.searchParams.set('code', code);
+        if (username) {
+          fileViewUrl.searchParams.set('username', username);
+        }
+        return NextResponse.redirect(fileViewUrl, 302);
+      }
+
       return NextResponse.redirect(originalUrl, 302);
     }
 

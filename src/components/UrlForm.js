@@ -1,11 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { FILE_SHARE_NOTICE_GUEST, FILE_SHARE_NOTICE_MEMBER, formatFileSize, MAX_FILE_BYTES } from '@/lib/shortFilesShared';
+
+const ACCEPT_ATTR =
+  '.pdf,.txt,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,application/pdf,text/plain,text/markdown,text/csv,image/*';
 
 export default function UrlForm({ user, onResult }) {
-  const [mode, setMode] = useState('url'); // 'url' | 'text'
+  const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'
   const [originalUrl, setOriginalUrl] = useState('');
   const [textContent, setTextContent] = useState('');
+  const [file, setFile] = useState(null);
   const [customCode, setCustomCode] = useState('');
   const [expireDuration, setExpireDuration] = useState('1week');
   const [passwordProtect, setPasswordProtect] = useState(false);
@@ -32,9 +37,52 @@ export default function UrlForm({ user, onResult }) {
       }
     }
 
+    if (mode === 'file') {
+      if (!file) {
+        setError('파일을 선택해주세요.');
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setError(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      if (mode === 'file') {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('custom_code', customCode);
+        form.append('expire_duration', expireDuration);
+        form.append('link_password_enabled', passwordProtect ? 'true' : 'false');
+        if (passwordProtect) {
+          form.append('link_password', linkPassword.trim());
+        }
+
+        const res = await fetch('/api/shorten-file', {
+          method: 'POST',
+          body: form,
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          onResult(data.data);
+          setFile(null);
+          setCustomCode('');
+          setPasswordProtect(false);
+          setLinkPassword('');
+          setConfirmPassword('');
+          if (e.target?.querySelector?.('#share-file')) {
+            e.target.querySelector('#share-file').value = '';
+          }
+        } else {
+          setError(data.message);
+        }
+        return;
+      }
+
       const body = {
         custom_code: customCode,
         expire_duration: expireDuration,
@@ -84,6 +132,11 @@ export default function UrlForm({ user, onResult }) {
     setError('');
   };
 
+  const memberBadgeText =
+    mode === 'file'
+      ? '파일은 최근 3개월 미접속 시 자동 삭제됩니다'
+      : `회원 ${mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다`;
+
   return (
     <div className="url-form-container">
       <form onSubmit={handleSubmit}>
@@ -109,9 +162,19 @@ export default function UrlForm({ user, onResult }) {
             <span className="mode-tab-icon">📋</span>
             텍스트 공유
           </button>
+          <button
+            type="button"
+            role="tab"
+            className={`mode-tab ${mode === 'file' ? 'is-active' : ''}`}
+            aria-selected={mode === 'file'}
+            onClick={() => handleModeChange('file')}
+          >
+            <span className="mode-tab-icon">📎</span>
+            파일 공유
+          </button>
         </div>
 
-        {/* URL Input / Text Input */}
+        {/* URL / Text / File Input */}
         <div className="form-group">
           {mode === 'url' ? (
             <>
@@ -126,7 +189,7 @@ export default function UrlForm({ user, onResult }) {
                 required
               />
             </>
-          ) : (
+          ) : mode === 'text' ? (
             <>
               <label className="form-label" htmlFor="text-content">공유할 텍스트</label>
               <textarea
@@ -144,6 +207,28 @@ export default function UrlForm({ user, onResult }) {
                   {textContent.length.toLocaleString()} / 50,000자
                 </div>
               )}
+            </>
+          ) : (
+            <>
+              <label className="form-label" htmlFor="share-file">공유할 파일</label>
+              <input
+                id="share-file"
+                type="file"
+                className="form-input"
+                accept={ACCEPT_ATTR}
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                required
+              />
+              {file && (
+                <div className="form-textarea-counter">
+                  {file.name} · {formatFileSize(file.size)}
+                </div>
+              )}
+              <p className="url-form-file-hint">
+                최대 {formatFileSize(MAX_FILE_BYTES)}. 문서(PDF, Office, HWP, TXT 등)와 이미지만 가능합니다.
+                {' '}
+                {user ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
+              </p>
             </>
           )}
         </div>
@@ -238,7 +323,7 @@ export default function UrlForm({ user, onResult }) {
         {user ? (
           <div className="form-group" style={{ textAlign: 'center' }}>
             <div className="member-badge">
-              ✨ 회원 {mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다
+              ✨ {memberBadgeText}
             </div>
           </div>
         ) : (
@@ -274,15 +359,17 @@ export default function UrlForm({ user, onResult }) {
             <><span className="spinner" /> 처리 중...</>
           ) : mode === 'url' ? (
             <>🔗 URL 단축하기</>
-          ) : (
+          ) : mode === 'text' ? (
             <>📋 단축 주소 만들기</>
+          ) : (
+            <>📎 파일 공유 주소 만들기</>
           )}
         </button>
         {!user && (
           <p className="url-form-guest-note">
             좋은 단축 코드를 나눠 사용하기 위해 만료 기간이 설정됩니다. 영구 단축을 원하시면{' '}
             <Link href="/register">회원가입</Link>을 하세요. 숏.한국/닉네임/단축코드로 영구적인 단축주소를 가질 수
-            있습니다.
+            있습니다. (파일 공유는 회원도 3개월 미접속 시 자동 삭제됩니다.)
           </p>
         )}
       </form>

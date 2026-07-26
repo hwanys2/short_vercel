@@ -82,24 +82,35 @@ export default function UrlResult({ data, user }) {
     a.remove();
   }, [data.short_url]);
 
-  const expirationText = user
-    ? '영구적으로 사용 가능'
-    : (() => {
-        const exp = new Date(data.expiration_date);
-        const now = new Date();
-        const diff = exp - now;
-        const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-        if (days <= 1) return '24시간 후 만료';
-        if (days <= 2) return '48시간 후 만료';
-        if (days <= 7) return '1주일 후 만료';
-        return '1개월 후 만료';
-      })();
+  const expirationText =
+    data.type === 'file' && user
+      ? '최근 3개월 미접속 시 자동 삭제'
+      : user
+        ? '영구적으로 사용 가능'
+        : (() => {
+            const exp = new Date(data.expiration_date);
+            const now = new Date();
+            const diff = exp - now;
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days <= 1) return '24시간 후 만료';
+            if (days <= 2) return '48시간 후 만료';
+            if (days <= 7) return '1주일 후 만료';
+            return '1개월 후 만료';
+          })();
+
+  const resultIcon = data.type === 'text' ? '📋' : data.type === 'file' ? '📎' : '✅';
+  const resultTitle =
+    data.type === 'text'
+      ? '텍스트 공유 주소가 만들어졌습니다!'
+      : data.type === 'file'
+        ? '파일 공유 주소가 만들어졌습니다!'
+        : 'URL이 성공적으로 단축되었습니다!';
 
   return (
     <div className="result-container">
       <div className="result-header">
-        <div className="result-icon">{data.type === 'text' ? '📋' : '✅'}</div>
-        <h3>{data.type === 'text' ? '텍스트 공유 주소가 만들어졌습니다!' : 'URL이 성공적으로 단축되었습니다!'}</h3>
+        <div className="result-icon">{resultIcon}</div>
+        <h3>{resultTitle}</h3>
       </div>
 
       <div className="result-content">

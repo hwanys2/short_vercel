@@ -3,61 +3,46 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
-import { deleteShortUrlWithFile } from '@/lib/shortFiles';
+import {
+  buildStoragePath,
+  deleteShortFile,
+  deleteShortUrlWithFile,
+  uploadShortFile,
+  validateUploadFile,
+} from '@/lib/shortFiles';
 
-const MAX_TEXT_LENGTH = 50000;
+export const runtime = 'nodejs';
 
 export async function POST(request) {
-  try {
-    const body = await request.json();
-    const {
-      custom_code,
-      expire_duration = '1week',
-      type = 'url',
-    } = body;
+  let uploadedPath = null;
 
-    // 타입 검증
-    if (type !== 'url' && type !== 'text') {
+  try {
+    const form = await request.formData();
+    const file = form.get('file');
+    const customCode = form.get('custom_code');
+    const expireDuration = form.get('expire_duration') || '1week';
+    const linkPasswordEnabled = form.get('link_password_enabled') === 'true' || form.get('link_password_enabled') === '1';
+    const linkPassword = typeof form.get('link_password') === 'string' ? form.get('link_password') : '';
+
+    if (!file || typeof file === 'string') {
       return NextResponse.json(
-        { status: 'error', message: '유효하지 않은 타입입니다.' },
+        { status: 'error', message: '파일을 선택해주세요.' },
         { status: 400 }
       );
     }
 
-    // 타입별 필수 입력 검증
-    if (type === 'url') {
-      if (!body.original_url) {
-        return NextResponse.json(
-          { status: 'error', message: '원본 URL은 필수 파라미터입니다.' },
-          { status: 400 }
-        );
-      }
-    } else {
-      // text mode
-      if (!body.text_content || body.text_content.trim() === '') {
-        return NextResponse.json(
-          { status: 'error', message: '공유할 텍스트를 입력해주세요.' },
-          { status: 400 }
-        );
-      }
-      if (body.text_content.length > MAX_TEXT_LENGTH) {
-        return NextResponse.json(
-          { status: 'error', message: `텍스트는 ${MAX_TEXT_LENGTH.toLocaleString()}자까지 입력 가능합니다.` },
-          { status: 400 }
-        );
-      }
+    const validated = validateUploadFile(file);
+    if (!validated.ok) {
+      return NextResponse.json({ status: 'error', message: validated.message }, { status: 400 });
     }
 
-    if (!custom_code || custom_code.trim() === '') {
+    const code = typeof customCode === 'string' ? customCode.trim() : '';
+    if (!code) {
       return NextResponse.json(
         { status: 'error', message: '단축 코드를 입력해주세요.' },
         { status: 400 }
       );
     }
-
-    const code = custom_code.trim();
-
-    // 코드 형식 검증
     if (!/^[가-힣a-zA-Z0-9_-]+$/.test(code)) {
       return NextResponse.json(
         { status: 'error', message: '단축 코드는 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.' },
@@ -65,24 +50,10 @@ export async function POST(request) {
       );
     }
 
-    // URL 유효성 검사 (URL 모드만)
-    if (type === 'url') {
-      const isValidUrl = isUrlValid(body.original_url);
-      if (!isValidUrl) {
-        return NextResponse.json(
-          { status: 'error', message: '유효한 URL을 입력해주세요.' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // 현재 사용자 확인
     const user = getUserFromRequest(request);
     const userId = user?.id || null;
-
     const supabase = getSupabaseAdmin();
 
-    // 코드 가용성 확인
     let query = supabase
       .from('short_urls')
       .select('id, expiration_date, user_id, type, file_path')
@@ -111,14 +82,11 @@ export async function POST(request) {
           { status: 409 }
         );
       }
-      // 만료된 코드면 삭제 (파일 타입이면 Storage도 삭제)
       await deleteShortUrlWithFile(existing);
     }
 
-    // 만료일 계산
     let expirationDate;
     if (userId) {
-      // 회원은 100년
       expirationDate = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
     } else {
       const durations = {
@@ -127,28 +95,33 @@ export async function POST(request) {
         '1week': 7 * 24 * 60 * 60 * 1000,
         '1month': 30 * 24 * 60 * 60 * 1000,
       };
-      const duration = durations[expire_duration] || durations['1week'];
+      const duration = durations[expireDuration] || durations['1week'];
       expirationDate = new Date(Date.now() + duration).toISOString();
     }
 
-    // 데이터 삽입
+    const storagePath = buildStoragePath({ userId, fileName: validated.fileName });
+    await uploadShortFile({ file, path: storagePath, mime: validated.mime });
+    uploadedPath = storagePath;
+
     const insertData = {
-      original_url: type === 'url' ? body.original_url : '__text__',
+      original_url: '__file__',
       code,
       expiration_date: expirationDate,
       visits: 0,
-      type,
+      type: 'file',
+      file_path: storagePath,
+      file_name: validated.fileName,
+      file_size: validated.fileSize,
+      file_mime: validated.mime,
     };
-
-    if (type === 'text') {
-      insertData.text_content = body.text_content;
-    }
 
     if (userId) insertData.user_id = userId;
 
-    if (body.link_password_enabled === true) {
-      const rawPwd = typeof body.link_password === 'string' ? body.link_password.trim() : '';
+    if (linkPasswordEnabled) {
+      const rawPwd = linkPassword.trim();
       if (!rawPwd || rawPwd.length < 6) {
+        await deleteShortFile(uploadedPath);
+        uploadedPath = null;
         return NextResponse.json(
           { status: 'error', message: '비밀번호 보호를 켤 경우 비밀번호는 6자 이상이어야 합니다.' },
           { status: 400 }
@@ -157,14 +130,12 @@ export async function POST(request) {
       insertData.link_password_hash = await hashPassword(rawPwd);
     }
 
-    const { data: inserted, error } = await supabase
-      .from('short_urls')
-      .insert(insertData)
-      .select()
-      .single();
+    const { error } = await supabase.from('short_urls').insert(insertData).select().single();
 
     if (error) {
-      console.error('URL insert error:', error);
+      console.error('File URL insert error:', error);
+      await deleteShortFile(uploadedPath);
+      uploadedPath = null;
       return NextResponse.json(
         { status: 'error', message: '단축 주소 생성 중 오류가 발생했습니다.' },
         { status: 500 }
@@ -176,39 +147,32 @@ export async function POST(request) {
       username: userId && user ? user.username : undefined,
     });
 
-    const successMessage = type === 'text'
-      ? '텍스트 공유 주소가 성공적으로 만들어졌습니다.'
-      : 'URL이 성공적으로 단축되었습니다.';
-
     return NextResponse.json(
       {
         status: 'success',
-        message: successMessage,
+        message: '파일 공유 주소가 성공적으로 만들어졌습니다.',
         data: {
           short_url: shortUrl,
-          original_url: type === 'url' ? body.original_url : null,
+          original_url: null,
           code,
           expiration_date: expirationDate,
-          type,
+          type: 'file',
+          file_name: validated.fileName,
+          file_size: validated.fileSize,
         },
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error('Shorten error:', error);
+    console.error('Shorten file error:', error);
+    if (uploadedPath) {
+      try {
+        await deleteShortFile(uploadedPath);
+      } catch {}
+    }
     return NextResponse.json(
-      { status: 'error', message: '단축 주소 생성 중 서버 오류가 발생했습니다.' },
+      { status: 'error', message: '파일 공유 주소 생성 중 서버 오류가 발생했습니다.' },
       { status: 500 }
     );
-  }
-}
-
-function isUrlValid(url) {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    // 한글 도메인 등 특수 URL 검증
-    return /^(https?:\/\/)?([가-힣\da-z.-]+)\.([가-힣a-z.]{2,6})([/\w가-힣.-]*)*\/?$/.test(url);
   }
 }

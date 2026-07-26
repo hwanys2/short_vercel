@@ -7,6 +7,7 @@ const STATIC_PATHS = [
   '/missing.link',
   '/link-gate',
   '/text-view',
+  '/file-view',
   '/login',
   '/register',
   '/dashboard',

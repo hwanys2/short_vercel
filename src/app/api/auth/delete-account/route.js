@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest, clearAuthCookie } from '@/lib/auth';
+import { deleteShortFiles } from '@/lib/shortFiles';
 
 export async function POST(request) {
   try {
@@ -15,6 +16,19 @@ export async function POST(request) {
     }
 
     const supabase = getSupabaseAdmin();
+
+    // 파일 공유 Storage 객체 먼저 삭제
+    const { data: fileRows } = await supabase
+      .from('short_urls')
+      .select('file_path')
+      .eq('user_id', user.id)
+      .eq('type', 'file')
+      .not('file_path', 'is', null);
+
+    const paths = (fileRows || []).map((r) => r.file_path).filter(Boolean);
+    if (paths.length > 0) {
+      await deleteShortFiles(paths);
+    }
 
     // 사용자의 URL 모두 삭제
     await supabase.from('short_urls').delete().eq('user_id', user.id);

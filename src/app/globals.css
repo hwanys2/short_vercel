@@ -725,6 +725,13 @@ a:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.url-form-file-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 /* ============ Text Viewer Page ============ */
 .text-viewer-page {
   max-width: 780px;

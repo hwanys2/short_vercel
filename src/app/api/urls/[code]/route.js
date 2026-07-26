@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
+import { deleteShortFile } from '@/lib/shortFiles';
 
 function sanitizeUrlRow(row) {
   if (!row) return row;
-  const { link_password_hash: _h, link_password_unlock_version: _v, ...rest } = row;
+  const { link_password_hash: _h, link_password_unlock_version: _v, file_path: _fp, ...rest } = row;
   return {
     ...rest,
     password_enabled: !!row.link_password_hash,
@@ -33,7 +34,9 @@ export async function GET(request, { params }) {
 
     const { data: row, error } = await supabase
       .from('short_urls')
-      .select('id, code, original_url, created_at, visits, last_visit, link_password_hash, type, text_content')
+      .select(
+        'id, code, original_url, created_at, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_mime'
+      )
       .eq('code', code)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -69,7 +72,7 @@ export async function PATCH(request, { params }) {
     const { data: row, error: fetchErr } = await supabase
       .from('short_urls')
       .select(
-        'id, code, original_url, created_at, visits, last_visit, link_password_hash, link_password_unlock_version, type, text_content'
+        'id, code, original_url, created_at, visits, last_visit, link_password_hash, link_password_unlock_version, type, text_content, file_name, file_size, file_mime'
       )
       .eq('code', code)
       .eq('user_id', user.id)
@@ -80,7 +83,9 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ success: false, message: 'URL을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    const isTextType = (row.type || 'url') === 'text';
+    const rowType = row.type || 'url';
+    const isTextType = rowType === 'text';
+    const isFileType = rowType === 'file';
 
     // 타입별 검증
     if (isTextType) {
@@ -93,6 +98,8 @@ export async function PATCH(request, { params }) {
           return NextResponse.json({ success: false, message: '텍스트는 50,000자까지 입력 가능합니다.' }, { status: 400 });
         }
       }
+    } else if (isFileType) {
+      // 파일 타입: 파일 교체 불가, 코드·비밀번호만 수정
     } else {
       // URL 타입: original_url 검증
       const orig = typeof original_url === 'string' ? original_url.trim() : '';
@@ -118,7 +125,7 @@ export async function PATCH(request, { params }) {
       if (text_content !== undefined) {
         updateFields.text_content = text_content;
       }
-    } else {
+    } else if (!isFileType) {
       // URL 타입: original_url 업데이트
       updateFields.original_url = typeof original_url === 'string' ? original_url.trim() : row.original_url;
     }
@@ -182,7 +189,11 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ success: false, message: 'URL 수정 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    const successMessage = isTextType ? '텍스트가 수정되었습니다.' : 'URL이 수정되었습니다.';
+    const successMessage = isTextType
+      ? '텍스트가 수정되었습니다.'
+      : isFileType
+        ? '파일 공유 링크가 수정되었습니다.'
+        : 'URL이 수정되었습니다.';
 
     return NextResponse.json({
       success: true,
@@ -204,11 +215,27 @@ export async function DELETE(request, { params }) {
 
     const { code } = await params;
     const supabase = getSupabaseAdmin();
+    const decoded = decodeCodeParam(code);
 
-    const { error, count } = await supabase
+    const { data: row } = await supabase
+      .from('short_urls')
+      .select('id, type, file_path')
+      .eq('code', decoded)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!row) {
+      return NextResponse.json({ success: false, message: 'URL을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    if (row.type === 'file' && row.file_path) {
+      await deleteShortFile(row.file_path);
+    }
+
+    const { error } = await supabase
       .from('short_urls')
       .delete()
-      .eq('code', decodeCodeParam(code))
+      .eq('id', row.id)
       .eq('user_id', user.id);
 
     if (error) throw error;

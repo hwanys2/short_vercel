@@ -107,4 +107,60 @@ ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS link_password_unlock_version INT
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS type VARCHAR(10) NOT NULL DEFAULT 'url';
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS text_content TEXT;
 
+-- 파일 공유 기능 지원
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_path TEXT;
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_size INTEGER;
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_mime TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_short_urls_file_cleanup
+  ON short_urls (type, user_id, last_visit, created_at)
+  WHERE type = 'file';
+
+CREATE INDEX IF NOT EXISTS idx_short_urls_guest_expiration
+  ON short_urls (expiration_date)
+  WHERE user_id IS NULL;
+
+-- Private Storage 버킷: short_files (OG용 short_site와 분리, 최대 3MB)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'short_files',
+  'short_files',
+  false,
+  3145728,
+  ARRAY[
+    'application/pdf',
+    'text/plain',
+    'text/markdown',
+    'text/csv',
+    'application/rtf',
+    'text/rtf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/haansofthwp',
+    'application/x-hwp',
+    'application/haansofthwpx',
+    'application/vnd.hancom.hwp',
+    'application/vnd.hancom.hwpx',
+    'application/octet-stream',
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/webp'
+  ]
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+-- 자동 정리: Vercel Cron → /api/cron/cleanup (CRON_SECRET)
+-- (A) 비회원: expiration_date < NOW() → DB 삭제 (+ type=file 이면 Storage도 삭제)
+-- (B) 회원 파일만: COALESCE(last_visit, created_at) < NOW() - 3 months → 링크·파일 삭제
+
 SELECT 'Supabase 테이블 생성 완료!';

@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [newCode, setNewCode] = useState('');
   const [newMode, setNewMode] = useState('url');
   const [newText, setNewText] = useState('');
+  const [newFile, setNewFile] = useState(null);
   const [creating, setCreating] = useState(false);
 
   // 회원탈퇴 모달
@@ -67,6 +68,32 @@ export default function DashboardPage() {
     setCreating(true);
     setMessage('');
     try {
+      if (newMode === 'file') {
+        if (!newFile) {
+          setMessage('파일을 선택해주세요.');
+          setMessageType('danger');
+          setCreating(false);
+          return;
+        }
+        const form = new FormData();
+        form.append('file', newFile);
+        form.append('custom_code', newCode);
+        form.append('link_password_enabled', 'false');
+        const res = await fetch('/api/shorten-file', { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.status === 'success') {
+          setMessage('파일 공유 주소가 성공적으로 생성되었습니다.');
+          setMessageType('success');
+          setNewCode('');
+          setNewFile(null);
+          fetchUrls();
+        } else {
+          setMessage(data.message);
+          setMessageType('danger');
+        }
+        return;
+      }
+
       const body = {
         custom_code: newCode,
         type: newMode,
@@ -160,7 +187,7 @@ export default function DashboardPage() {
           <div className="dashboard-header">
             <h1>{user.username}님의 대시보드</h1>
             <div className="user-badge">
-              ✨ 영구 URL · 기본 URL: {baseUrl}{user.username}/코드
+              ✨ URL·텍스트는 영구 · 파일은 3개월 미접속 시 삭제 · {baseUrl}{user.username}/코드
             </div>
           </div>
 
@@ -181,6 +208,9 @@ export default function DashboardPage() {
                 <button type="button" role="tab" className={`mode-tab ${newMode === 'text' ? 'is-active' : ''}`} onClick={() => setNewMode('text')}>
                   <span className="mode-tab-icon">📋</span> 텍스트 공유
                 </button>
+                <button type="button" role="tab" className={`mode-tab ${newMode === 'file' ? 'is-active' : ''}`} onClick={() => setNewMode('file')}>
+                  <span className="mode-tab-icon">📎</span> 파일 공유
+                </button>
               </div>
               <form onSubmit={handleCreate} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 {newMode === 'url' ? (
@@ -188,10 +218,25 @@ export default function DashboardPage() {
                     <label className="form-label" htmlFor="dash-url">원본 URL</label>
                     <input id="dash-url" type="url" className="form-input" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required />
                   </div>
-                ) : (
+                ) : newMode === 'text' ? (
                   <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
                     <label className="form-label" htmlFor="dash-text">공유할 텍스트</label>
                     <textarea id="dash-text" className="form-input form-textarea" placeholder="프롬프트, 코드, 메시지 등" value={newText} onChange={(e) => setNewText(e.target.value)} required rows={3} maxLength={50000} />
+                  </div>
+                ) : (
+                  <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="dash-file">공유할 파일 (최대 3MB)</label>
+                    <input
+                      id="dash-file"
+                      type="file"
+                      className="form-input"
+                      accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp"
+                      onChange={(e) => setNewFile(e.target.files?.[0] || null)}
+                      required
+                    />
+                    <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      최근 3개월 미접속 시 링크와 파일이 자동 삭제됩니다.
+                    </p>
                   </div>
                 )}
                 <div className="form-group" style={{ flex: '1.5', minWidth: '180px', marginBottom: 0 }}>
@@ -241,14 +286,24 @@ export default function DashboardPage() {
                     <tbody>
                       {urls.map((url) => (
                         <tr key={url.code}>
-                          <td>{url.type === 'text' ? '📋' : '🔗'}</td>
+                          <td>{url.type === 'text' ? '📋' : url.type === 'file' ? '📎' : '🔗'}</td>
                           <td>
                             <a href={buildShortUrl({ baseUrl, code: url.code, username: user.username })} target="_blank" rel="noopener noreferrer">
                               {user.username}/{url.code}
                             </a>
                           </td>
-                          <td className="url-cell" title={url.type === 'text' ? (url.text_preview || '텍스트 메모') : url.original_url}>
-                            {url.type === 'text' ? (url.text_preview ? `${url.text_preview}...` : '텍스트 메모') : url.original_url}
+                          <td className="url-cell" title={
+                            url.type === 'text'
+                              ? (url.text_preview || '텍스트 메모')
+                              : url.type === 'file'
+                                ? (url.file_name || '파일')
+                                : url.original_url
+                          }>
+                            {url.type === 'text'
+                              ? (url.text_preview ? `${url.text_preview}...` : '텍스트 메모')
+                              : url.type === 'file'
+                                ? (url.file_name || '파일')
+                                : url.original_url}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{new Date(url.created_at).toLocaleDateString('ko-KR')}</td>
                           <td>{url.visits}</td>

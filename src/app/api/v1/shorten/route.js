@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { guestDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
+import { deleteShortUrlWithFile } from '@/lib/shortFiles';
 
 export async function GET() {
   return NextResponse.json({
@@ -100,7 +101,7 @@ export async function POST(request) {
 
       const { data: existing } = await supabase
         .from('short_urls')
-        .select('expiration_date')
+        .select('id, expiration_date, type, file_path')
         .eq('code', customCode)
         .is('user_id', null)
         .maybeSingle();
@@ -117,7 +118,7 @@ export async function POST(request) {
             { status: 409 }
           );
         }
-        await supabase.from('short_urls').delete().eq('code', customCode).is('user_id', null);
+        await deleteShortUrlWithFile(existing);
       }
     }
 

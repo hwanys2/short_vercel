@@ -15,9 +15,11 @@ export default function EditUrlPage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingUrl, setLoadingUrl] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [urlType, setUrlType] = useState('url'); // 'url' | 'text'
+  const [urlType, setUrlType] = useState('url'); // 'url' | 'text' | 'file'
   const [originalUrl, setOriginalUrl] = useState('');
   const [textContent, setTextContent] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [fileSize, setFileSize] = useState(null);
   const [customCode, setCustomCode] = useState('');
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [hadPasswordProtection, setHadPasswordProtection] = useState(false);
@@ -59,6 +61,8 @@ export default function EditUrlPage() {
       setUrlType(type);
       setOriginalUrl(data.url.original_url);
       setTextContent(data.url.text_content || '');
+      setFileName(data.url.file_name || '');
+      setFileSize(data.url.file_size ?? null);
       setCustomCode(data.url.code);
       const protectedNow = !!data.url.password_enabled;
       setPasswordEnabled(protectedNow);
@@ -105,7 +109,7 @@ export default function EditUrlPage() {
 
       if (urlType === 'text') {
         payload.text_content = textContent;
-      } else {
+      } else if (urlType !== 'file') {
         payload.original_url = originalUrl;
       }
 
@@ -147,8 +151,9 @@ export default function EditUrlPage() {
   }
 
   const isText = urlType === 'text';
-  const pageTitle = isText ? '텍스트 수정' : 'URL 수정';
-  const cardTitle = isText ? '📋 텍스트 편집' : '✏️ 단축 URL 편집';
+  const isFile = urlType === 'file';
+  const pageTitle = isText ? '텍스트 수정' : isFile ? '파일 공유 수정' : 'URL 수정';
+  const cardTitle = isText ? '📋 텍스트 편집' : isFile ? '📎 파일 공유 편집' : '✏️ 단축 URL 편집';
 
   return (
     <>
@@ -182,7 +187,7 @@ export default function EditUrlPage() {
                   {error && <div className="alert alert-danger" style={{ marginBottom: '16px' }}>⚠️ {error}</div>}
 
                   {/* URL 타입: 원본 URL 입력 */}
-                  {!isText && (
+                  {!isText && !isFile && (
                     <div className="form-group">
                       <label className="form-label" htmlFor="edit-original">원본 URL</label>
                       <input
@@ -216,6 +221,20 @@ export default function EditUrlPage() {
                           {textContent.length.toLocaleString()} / 50,000자
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* 파일 타입: 파일명 표시만 (교체 불가) */}
+                  {isFile && (
+                    <div className="form-group">
+                      <label className="form-label">공유 파일</label>
+                      <div className="form-input" style={{ background: 'var(--bg-muted, #f5f5f8)' }}>
+                        {fileName || '파일'}
+                        {fileSize != null ? ` · ${(fileSize / 1024).toFixed(1)} KB` : ''}
+                      </div>
+                      <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        파일 내용은 교체할 수 없습니다. 코드·비밀번호만 수정 가능합니다. 최근 3개월 미접속 시 자동 삭제됩니다.
+                      </p>
                     </div>
                   )}
 
