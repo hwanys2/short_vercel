@@ -105,16 +105,6 @@ export function normalizeDisplayFileName(filename) {
   return cleaned || 'file';
 }
 
-export function sanitizeFileName(filename) {
-  const raw = normalizeDisplayFileName(filename);
-  const cleaned = raw
-    .replace(/[^\w.\-가-힣()[\] ]+/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 180);
-  return cleaned || 'file';
-}
-
 /**
  * Resolve MIME: prefer browser type when allowed; else extension fallback.
  * Rejects unknown / blocked types. `application/octet-stream` only for hwp/hwpx.
@@ -181,12 +171,13 @@ export function validateUploadFile(file) {
 }
 
 export function buildStoragePath({ userId, fileName }) {
-  const safe = sanitizeFileName(fileName);
+  const extension = getFileExtension(fileName);
   const id = randomUUID();
+  const objectName = `${id}.${extension}`;
   if (userId) {
-    return `user/${userId}/${id}/${safe}`;
+    return `user/${userId}/${id}/${objectName}`;
   }
-  return `guest/${id}/${safe}`;
+  return `guest/${id}/${objectName}`;
 }
 
 export async function uploadShortFile({ file, path, mime }) {
@@ -198,7 +189,9 @@ export async function uploadShortFile({ file, path, mime }) {
   });
   if (error) {
     console.error('Storage upload error:', error);
-    throw new Error('파일 업로드에 실패했습니다.');
+    const storageError = new Error('파일 저장소 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    storageError.name = 'ShortFileStorageError';
+    throw storageError;
   }
   return path;
 }

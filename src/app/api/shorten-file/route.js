@@ -170,6 +170,12 @@ export async function POST(request) {
         await deleteShortFile(uploadedPath);
       } catch {}
     }
+    if (error?.name === 'ShortFileStorageError') {
+      return NextResponse.json(
+        { status: 'error', message: error.message },
+        { status: 502 }
+      );
+    }
     return NextResponse.json(
       { status: 'error', message: '파일 공유 주소 생성 중 서버 오류가 발생했습니다.' },
       { status: 500 }
