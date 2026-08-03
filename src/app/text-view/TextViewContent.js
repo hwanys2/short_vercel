@@ -12,7 +12,8 @@ export default function TextViewContent() {
   const code = searchParams.get('code');
   const username = searchParams.get('username');
 
-  const [textContent, setTextContent] = useState('');
+  const [originalContent, setOriginalContent] = useState('');
+  const [editableContent, setEditableContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -32,7 +33,8 @@ export default function TextViewContent() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setTextContent(data.text_content);
+          setOriginalContent(data.text_content);
+          setEditableContent(data.text_content);
         } else {
           setError(true);
         }
@@ -43,7 +45,7 @@ export default function TextViewContent() {
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(textContent);
+      await navigator.clipboard.writeText(editableContent);
       setCopied(true);
       setTimeout(() => setCopied(false), 2400);
     } catch {
@@ -55,12 +57,17 @@ export default function TextViewContent() {
         setTimeout(() => setCopied(false), 2400);
       }
     }
-  }, [textContent]);
+  }, [editableContent]);
+
+  const handleReset = useCallback(() => {
+    setEditableContent(originalContent);
+  }, [originalContent]);
 
   const shortUrl = buildShortUrl({ code, username: username || undefined });
 
-  const charCount = textContent.length;
-  const lineCount = textContent ? textContent.split('\n').length : 0;
+  const isModified = editableContent !== originalContent;
+  const charCount = editableContent.length;
+  const lineCount = editableContent ? editableContent.split('\n').length : 0;
 
   if (loading) {
     return (
@@ -120,6 +127,12 @@ export default function TextViewContent() {
                     <span>{charCount.toLocaleString()}자</span>
                     <span className="text-viewer-meta-dot">·</span>
                     <span>{lineCount.toLocaleString()}줄</span>
+                    {isModified && (
+                      <>
+                        <span className="text-viewer-meta-dot">·</span>
+                        <span className="text-viewer-meta-modified">수정됨</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -141,15 +154,24 @@ export default function TextViewContent() {
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                       <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                     </svg>
-                    전체 복사
+                    복사하기
                   </>
                 )}
               </button>
             </div>
 
-            {/* Text Content */}
+            {/* Text Content — locally editable before copy */}
+            <p className="text-viewer-edit-hint">
+              복사 전 내용을 자유롭게 수정할 수 있습니다. 원본 데이터는 변경되지 않습니다.
+            </p>
             <div className="text-viewer-body">
-              <pre className="text-viewer-content">{textContent}</pre>
+              <textarea
+                className="text-viewer-content text-viewer-editor"
+                value={editableContent}
+                onChange={(e) => setEditableContent(e.target.value)}
+                spellCheck={false}
+                aria-label="공유된 텍스트 (복사 전 수정 가능)"
+              />
             </div>
 
             {/* Footer bar */}
@@ -159,12 +181,21 @@ export default function TextViewContent() {
                 <code className="text-viewer-source-url">{shortUrl}</code>
               </div>
               <div className="text-viewer-footer-actions">
+                {isModified && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleReset}
+                    type="button"
+                  >
+                    원본으로 되돌리기
+                  </button>
+                )}
                 <button
                   className={`btn btn-sm ${copied ? 'text-viewer-copy-btn is-copied' : 'btn-primary'}`}
                   onClick={handleCopy}
                   type="button"
                 >
-                  {copied ? '✓ 복사됨' : '📋 전체 복사'}
+                  {copied ? '✓ 복사됨' : '📋 복사하기'}
                 </button>
                 <Link href="/" className="btn btn-secondary btn-sm">
                   나도 만들기
@@ -184,7 +215,7 @@ export default function TextViewContent() {
       {/* Hidden textarea fallback for copy */}
       <textarea
         ref={fallbackRef}
-        value={textContent}
+        value={editableContent}
         readOnly
         aria-hidden="true"
         style={{

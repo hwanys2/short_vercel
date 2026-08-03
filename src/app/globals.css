@@ -834,6 +834,19 @@ a:hover {
   opacity: 0.5;
 }
 
+.text-viewer-meta-modified {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.text-viewer-edit-hint {
+  margin: 0;
+  padding: 10px 24px 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 .text-viewer-copy-btn {
   min-width: 120px;
   font-size: 0.9rem;
@@ -871,6 +884,21 @@ a:hover {
   background: transparent;
   tab-size: 2;
   -moz-tab-size: 2;
+}
+
+.text-viewer-editor {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  field-sizing: content;
+}
+
+.text-viewer-editor:focus {
+  background: rgba(94, 105, 235, 0.04);
 }
 
 .text-viewer-body::-webkit-scrollbar {
@@ -985,6 +1013,11 @@ a:hover {
   .text-viewer-content {
     padding: 16px 18px;
     font-size: 0.85rem;
+  }
+
+  .text-viewer-edit-hint {
+    padding: 8px 18px 0;
+    font-size: 0.75rem;
   }
 
   .text-viewer-footer {
