@@ -201,30 +201,42 @@ export default function DashboardPage() {
           <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
             <div className="card-header">➕ 새 단축 주소 생성</div>
             <div className="card-body">
-              <div className="mode-tabs" role="tablist" style={{ marginBottom: '16px' }}>
-                <button type="button" role="tab" className={`mode-tab ${newMode === 'url' ? 'is-active' : ''}`} onClick={() => setNewMode('url')}>
-                  <span className="mode-tab-icon">🔗</span> URL 단축
+              <div className="mode-tabs" role="tablist" aria-label="입력 모드 선택" style={{ marginBottom: '16px' }}>
+                <button type="button" role="tab" className={`mode-tab ${newMode === 'url' ? 'is-active' : ''}`} aria-selected={newMode === 'url'} aria-label="URL 단축" onClick={() => setNewMode('url')}>
+                  <span className="mode-tab-icon" aria-hidden="true">🔗</span>
+                  <span className="mode-tab-text">
+                    <span className="mode-tab-text-full">URL 단축</span>
+                    <span className="mode-tab-text-short">URL</span>
+                  </span>
                 </button>
-                <button type="button" role="tab" className={`mode-tab ${newMode === 'text' ? 'is-active' : ''}`} onClick={() => setNewMode('text')}>
-                  <span className="mode-tab-icon">📋</span> 텍스트 공유
+                <button type="button" role="tab" className={`mode-tab ${newMode === 'text' ? 'is-active' : ''}`} aria-selected={newMode === 'text'} aria-label="텍스트 공유" onClick={() => setNewMode('text')}>
+                  <span className="mode-tab-icon" aria-hidden="true">📋</span>
+                  <span className="mode-tab-text">
+                    <span className="mode-tab-text-full">텍스트 공유</span>
+                    <span className="mode-tab-text-short">텍스트</span>
+                  </span>
                 </button>
-                <button type="button" role="tab" className={`mode-tab ${newMode === 'file' ? 'is-active' : ''}`} onClick={() => setNewMode('file')}>
-                  <span className="mode-tab-icon">📎</span> 파일 공유
+                <button type="button" role="tab" className={`mode-tab ${newMode === 'file' ? 'is-active' : ''}`} aria-selected={newMode === 'file'} aria-label="파일 공유" onClick={() => setNewMode('file')}>
+                  <span className="mode-tab-icon" aria-hidden="true">📎</span>
+                  <span className="mode-tab-text">
+                    <span className="mode-tab-text-full">파일 공유</span>
+                    <span className="mode-tab-text-short">파일</span>
+                  </span>
                 </button>
               </div>
-              <form onSubmit={handleCreate} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <form onSubmit={handleCreate} className="dashboard-create-form">
                 {newMode === 'url' ? (
-                  <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
+                  <div className="form-group dashboard-create-main">
                     <label className="form-label" htmlFor="dash-url">원본 URL</label>
                     <input id="dash-url" type="url" className="form-input" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required />
                   </div>
                 ) : newMode === 'text' ? (
-                  <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
+                  <div className="form-group dashboard-create-main">
                     <label className="form-label" htmlFor="dash-text">공유할 텍스트</label>
                     <textarea id="dash-text" className="form-input form-textarea" placeholder="프롬프트, 코드, 메시지 등" value={newText} onChange={(e) => setNewText(e.target.value)} required rows={3} maxLength={50000} />
                   </div>
                 ) : (
-                  <div className="form-group" style={{ flex: '2', minWidth: '200px', marginBottom: 0 }}>
+                  <div className="form-group dashboard-create-main">
                     <label className="form-label" htmlFor="dash-file">공유할 파일 (최대 3MB)</label>
                     <input
                       id="dash-file"
@@ -234,19 +246,19 @@ export default function DashboardPage() {
                       onChange={(e) => setNewFile(e.target.files?.[0] || null)}
                       required
                     />
-                    <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <p className="url-form-file-hint">
                       최근 3개월 미접속 시 링크와 파일이 자동 삭제됩니다.
                     </p>
                   </div>
                 )}
-                <div className="form-group" style={{ flex: '1.5', minWidth: '180px', marginBottom: 0 }}>
+                <div className="form-group dashboard-create-code">
                   <label className="form-label" htmlFor="dash-code">단축 코드</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{user.username}/</span>
+                  <div className="dashboard-create-code-row">
+                    <span className="dashboard-create-code-prefix">{user.username}/</span>
                     <input id="dash-code" type="text" className="form-input" placeholder="원하는코드" value={newCode} onChange={(e) => setNewCode(e.target.value)} required />
                   </div>
                 </div>
-                <button type="submit" className="btn btn-primary" disabled={creating} style={{ height: '48px', marginBottom: 0 }}>
+                <button type="submit" className="btn btn-primary dashboard-create-submit" disabled={creating}>
                   {creating ? '생성 중...' : '생성'}
                 </button>
               </form>

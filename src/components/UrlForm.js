@@ -147,30 +147,42 @@ export default function UrlForm({ user, onResult }) {
             role="tab"
             className={`mode-tab ${mode === 'url' ? 'is-active' : ''}`}
             aria-selected={mode === 'url'}
+            aria-label="URL 단축"
             onClick={() => handleModeChange('url')}
           >
-            <span className="mode-tab-icon">🔗</span>
-            URL 단축
+            <span className="mode-tab-icon" aria-hidden="true">🔗</span>
+            <span className="mode-tab-text">
+              <span className="mode-tab-text-full">URL 단축</span>
+              <span className="mode-tab-text-short">URL</span>
+            </span>
           </button>
           <button
             type="button"
             role="tab"
             className={`mode-tab ${mode === 'text' ? 'is-active' : ''}`}
             aria-selected={mode === 'text'}
+            aria-label="텍스트 공유"
             onClick={() => handleModeChange('text')}
           >
-            <span className="mode-tab-icon">📋</span>
-            텍스트 공유
+            <span className="mode-tab-icon" aria-hidden="true">📋</span>
+            <span className="mode-tab-text">
+              <span className="mode-tab-text-full">텍스트 공유</span>
+              <span className="mode-tab-text-short">텍스트</span>
+            </span>
           </button>
           <button
             type="button"
             role="tab"
             className={`mode-tab ${mode === 'file' ? 'is-active' : ''}`}
             aria-selected={mode === 'file'}
+            aria-label="파일 공유"
             onClick={() => handleModeChange('file')}
           >
-            <span className="mode-tab-icon">📎</span>
-            파일 공유
+            <span className="mode-tab-icon" aria-hidden="true">📎</span>
+            <span className="mode-tab-text">
+              <span className="mode-tab-text-full">파일 공유</span>
+              <span className="mode-tab-text-short">파일</span>
+            </span>
           </button>
         </div>
 
