@@ -33,7 +33,7 @@ export default function GuidePage() {
           <h2>3. 파일 공유</h2>
           <p>문서·이미지 파일을 단축 주소로 공유할 수 있습니다. (최대 3MB)</p>
           <ul>
-            <li>허용: PDF, Office, HWP, TXT/MD/CSV, 이미지(PNG/JPG/GIF/WEBP) 등</li>
+            <li>허용: PDF, Office, HWP, TXT/HTML/MD/CSV, 이미지(PNG/JPG/GIF/WEBP) 등</li>
             <li>비회원: 선택한 만료 기간이 지나면 <strong>링크와 업로드 파일이 함께 삭제</strong>됩니다.</li>
             <li>회원: URL·텍스트와 달리, 파일 공유만 <strong>최근 3개월간 접속이 없으면</strong> 링크와 파일이 자동 삭제됩니다.</li>
             <li>개인정보 보호와 스토리지 용량을 위해 링크 소멸 시 파일도 함께 제거합니다.</li>

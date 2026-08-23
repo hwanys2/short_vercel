@@ -242,7 +242,7 @@ export default function DashboardPage() {
                       id="dash-file"
                       type="file"
                       className="form-input"
-                      accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp"
+                      accept=".pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp"
                       onChange={(e) => setNewFile(e.target.files?.[0] || null)}
                       required
                     />

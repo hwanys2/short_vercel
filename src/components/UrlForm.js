@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FILE_SHARE_NOTICE_GUEST, FILE_SHARE_NOTICE_MEMBER, formatFileSize, MAX_FILE_BYTES } from '@/lib/shortFilesShared';
 
 const ACCEPT_ATTR =
-  '.pdf,.txt,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,application/pdf,text/plain,text/markdown,text/csv,image/*';
+  '.pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,application/pdf,text/plain,text/html,text/markdown,text/csv,image/*';
 
 export default function UrlForm({ user, onResult }) {
   const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'

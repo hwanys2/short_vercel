@@ -23,6 +23,7 @@ export const SHORT_FILES_BUCKET =
 export const ALLOWED_FILE_MIMES = new Set([
   'application/pdf',
   'text/plain',
+  'text/html',
   'text/markdown',
   'text/csv',
   'application/rtf',
@@ -48,6 +49,8 @@ export const ALLOWED_FILE_MIMES = new Set([
 const EXT_MIME_FALLBACK = {
   pdf: 'application/pdf',
   txt: 'text/plain',
+  html: 'text/html',
+  htm: 'text/html',
   md: 'text/markdown',
   markdown: 'text/markdown',
   csv: 'text/csv',
@@ -86,8 +89,6 @@ const BLOCKED_EXTENSIONS = new Set([
   'js',
   'mjs',
   'cjs',
-  'html',
-  'htm',
   'svg',
   'php',
 ]);
