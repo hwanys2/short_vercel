@@ -248,11 +248,15 @@ export async function deleteShortUrlWithFile(rowOrId) {
   }
 }
 
-export async function createSignedDownloadUrl(filePath, expiresIn = 60) {
+export async function createSignedDownloadUrl(filePath, expiresIn = 60, downloadFileName) {
   const supabase = getSupabaseAdmin();
+  const download =
+    typeof downloadFileName === 'string' && downloadFileName.trim()
+      ? downloadFileName.trim()
+      : true;
   const { data, error } = await supabase.storage
     .from(SHORT_FILES_BUCKET)
-    .createSignedUrl(filePath, expiresIn);
+    .createSignedUrl(filePath, expiresIn, { download });
   if (error || !data?.signedUrl) {
     console.error('Signed URL error:', error);
     throw new Error('다운로드 링크를 만들 수 없습니다.');

@@ -72,16 +72,8 @@ export async function GET(request) {
       }
     }
 
-    const signedUrl = await createSignedDownloadUrl(urlData.file_path, 120);
-    const redirect = NextResponse.redirect(signedUrl, 302);
-    // Hint download filename when possible (signed URL host may ignore)
-    if (urlData.file_name) {
-      redirect.headers.set(
-        'Content-Disposition',
-        `attachment; filename*=UTF-8''${encodeURIComponent(urlData.file_name)}`
-      );
-    }
-    return redirect;
+    const signedUrl = await createSignedDownloadUrl(urlData.file_path, 120, urlData.file_name);
+    return NextResponse.redirect(signedUrl, 302);
   } catch (error) {
     console.error('File download error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
