@@ -131,6 +131,7 @@ VALUES (
   ARRAY[
     'application/pdf',
     'text/plain',
+    'text/html',
     'text/markdown',
     'text/csv',
     'application/rtf',
