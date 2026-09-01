@@ -697,6 +697,10 @@ a:hover {
   .url-form-password-reveal {
     transition: none;
   }
+
+  .stats-breakdown {
+    animation: none;
+  }
 }
 
 /* ============ Mode Tabs (Segmented Control) ============ */
@@ -1417,7 +1421,57 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  margin-bottom: 60px;
+  margin-bottom: 14px;
+}
+
+.stats-breakdown {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  margin: 0 0 52px;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  animation: stats-breakdown-in 0.45s ease;
+}
+
+@keyframes stats-breakdown-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stats-breakdown li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+}
+
+.stats-breakdown li + li {
+  margin-left: 14px;
+}
+
+.stats-breakdown li + li::before {
+  content: '·';
+  margin-right: 14px;
+  opacity: 0.4;
+  font-weight: 400;
+}
+
+.stats-breakdown-label {
+  opacity: 0.78;
+}
+
+.stats-breakdown-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0;
 }
 
 .stat-card {
@@ -2339,6 +2393,20 @@ tr:hover td {
   .stats-row {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .stats-breakdown {
+    font-size: 0.74rem;
+    margin-bottom: 36px;
+    row-gap: 6px;
+  }
+
+  .stats-breakdown li + li {
+    margin-left: 10px;
+  }
+
+  .stats-breakdown li + li::before {
+    margin-right: 10px;
   }
 
   .result-content {

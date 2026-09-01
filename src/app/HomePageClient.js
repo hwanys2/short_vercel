@@ -14,7 +14,13 @@ const HOME_RAIL_AD_SLOT = '3012878973';
 export default function HomePageClient() {
   const [user, setUser] = useState(null);
   const [result, setResult] = useState(null);
-  const [stats, setStats] = useState({ total: 0, today: 0, users: 0 });
+  const [stats, setStats] = useState({
+    total: 0,
+    today: 0,
+    users: 0,
+    byType: { url: 0, text: 0, file: 0 },
+  });
+  const [statsReady, setStatsReady] = useState(false);
   const resultAnchorRef = useRef(null);
   const isWide = useMediaQuery('(min-width: 1280px)');
 
@@ -40,7 +46,10 @@ export default function HomePageClient() {
     fetch('/api/stats')
       .then((res) => res.json())
       .then((data) => {
-        if (data.status === 'success') setStats(data.data);
+        if (data.status === 'success') {
+          setStats(data.data);
+          setStatsReady(true);
+        }
       })
       .catch(() => {});
   }, []);
@@ -108,6 +117,22 @@ export default function HomePageClient() {
                   <div className="stat-label">회원 수</div>
                 </div>
               </div>
+              {statsReady && (
+                <ul className="stats-breakdown" aria-label="활성 URL 유형별 개수">
+                  <li>
+                    <span className="stats-breakdown-label">URL 단축</span>
+                    <span className="stats-breakdown-count">{(stats.byType?.url ?? 0).toLocaleString()}</span>
+                  </li>
+                  <li>
+                    <span className="stats-breakdown-label">텍스트 공유</span>
+                    <span className="stats-breakdown-count">{(stats.byType?.text ?? 0).toLocaleString()}</span>
+                  </li>
+                  <li>
+                    <span className="stats-breakdown-label">파일 공유</span>
+                    <span className="stats-breakdown-count">{(stats.byType?.file ?? 0).toLocaleString()}</span>
+                  </li>
+                </ul>
+              )}
             </div>
           </div>
         </div>

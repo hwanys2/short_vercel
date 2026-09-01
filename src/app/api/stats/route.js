@@ -2,33 +2,42 @@ import { NextResponse } from 'next/server';
 import { getSeoulStartOfTodayISO } from '@/lib/kstDate';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+async function countActiveByType(supabase, nowIso, type) {
+  const { count } = await supabase
+    .from('short_urls')
+    .select('*', { count: 'exact', head: true })
+    .gt('expiration_date', nowIso)
+    .eq('type', type);
+  return count || 0;
+}
+
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
+    const nowIso = new Date().toISOString();
 
-    // 만료되지 않은 단축 URL 수 (비회원 만료분 제외, 회원·유효 비회원 포함)
-    const { count: total } = await supabase
-      .from('short_urls')
-      .select('*', { count: 'exact', head: true })
-      .gt('expiration_date', new Date().toISOString());
-
-    // 오늘 생성된 URL 수 (한국 날짜 기준 00:00 KST ~)
-    const { count: todayCount } = await supabase
-      .from('short_urls')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', getSeoulStartOfTodayISO());
-
-    // 전체 사용자 수
-    const { count: userCount } = await supabase
-      .from('short_users')
-      .select('*', { count: 'exact', head: true });
+    const [urlCount, textCount, fileCount, todayCountResult, userCountResult] = await Promise.all([
+      countActiveByType(supabase, nowIso, 'url'),
+      countActiveByType(supabase, nowIso, 'text'),
+      countActiveByType(supabase, nowIso, 'file'),
+      supabase
+        .from('short_urls')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', getSeoulStartOfTodayISO()),
+      supabase.from('short_users').select('*', { count: 'exact', head: true }),
+    ]);
 
     return NextResponse.json({
       status: 'success',
       data: {
-        total: total || 0,
-        today: todayCount || 0,
-        users: userCount || 0,
+        total: urlCount + textCount + fileCount,
+        today: todayCountResult.count || 0,
+        users: userCountResult.count || 0,
+        byType: {
+          url: urlCount,
+          text: textCount,
+          file: fileCount,
+        },
       },
     });
   } catch (error) {
