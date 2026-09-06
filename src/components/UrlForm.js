@@ -128,11 +128,53 @@ export default function UrlForm({ user, onResult }) {
     }
   };
 
+  const handleFileChange = (selectedFile) => {
+    setFile(selectedFile);
+    if (!selectedFile) return;
+
+    if (selectedFile.size > 1024 * 1024 * 1024) {
+      setExpireDuration('48h');
+    } else if (selectedFile.size >= 3 * 1024 * 1024) {
+      setExpireDuration('1week');
+    }
+  };
+
   const handleModeChange = (newMode) => {
     if (newMode === mode) return;
     setMode(newMode);
     setError('');
+    if (newMode === 'file' && file) {
+      if (file.size > 1024 * 1024 * 1024) {
+        setExpireDuration('48h');
+      } else if (file.size >= 3 * 1024 * 1024) {
+        setExpireDuration('1week');
+      }
+    }
   };
+
+  const isFileMode = mode === 'file';
+  const isLargeR2 = isFileMode && Boolean(file && file.size > 1024 * 1024 * 1024);
+  const isNormalR2 = isFileMode && Boolean(file && file.size >= 3 * 1024 * 1024 && file.size <= 1024 * 1024 * 1024);
+  const isR2File = isLargeR2 || isNormalR2;
+
+  let durationOptions = [
+    { value: '24h', label: '24시간' },
+    { value: '48h', label: '48시간' },
+    { value: '1week', label: '1주일' },
+    { value: '1month', label: '1개월' },
+  ];
+
+  if (isLargeR2) {
+    // 1GB 초과 파일: 딱 2일(48시간)만 가능
+    durationOptions = [
+      { value: '48h', label: '🔒 2일 (48시간 후 종료 - 저장 기간 일치)' },
+    ];
+  } else if (isNormalR2) {
+    // 3MB 초과 ~ 1GB 이하 파일: 딱 7일(1주일)만 가능
+    durationOptions = [
+      { value: '1week', label: '🔒 7일 (1주일 후 종료 - 저장 기간 일치)' },
+    ];
+  }
 
   const memberBadgeText =
     mode === 'file'
@@ -232,7 +274,7 @@ export default function UrlForm({ user, onResult }) {
                 type="file"
                 className="form-input"
                 accept={ACCEPT_ATTR}
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
                 required
               />
 
@@ -362,7 +404,8 @@ export default function UrlForm({ user, onResult }) {
           </div>
         </div>
 
-        {user ? (
+        {/* 만료 기간 (또는 회원 영구 배지) */}
+        {user && !isR2File ? (
           <div className="form-group" style={{ textAlign: 'center' }}>
             <div className="member-badge">
               ✨ {memberBadgeText}
@@ -370,26 +413,24 @@ export default function UrlForm({ user, onResult }) {
           </div>
         ) : (
           <div className="form-group">
-            <label className="form-label">만료 기간</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>
+                {isR2File ? '만료 기간 (파일 저장 기간에 맞춰 자동 지정)' : '만료 기간'}
+              </label>
+              {isR2File && (
+                <span
+                  style={{
+                    fontSize: '0.78rem',
+                    color: isLargeR2 ? '#ef4444' : '#10b981',
+                    fontWeight: 700,
+                  }}
+                >
+                  {isLargeR2 ? '⚡ 1GB 초과: 딱 2일(48h)만 가능' : '⚡ 1GB 이하: 딱 7일(1week)만 가능'}
+                </span>
+              )}
+            </div>
             <div className="duration-options">
-              {(mode === 'file'
-                ? (file && file.size > 1024 * 1024 * 1024
-                    ? [
-                        { value: '24h', label: '24시간' },
-                        { value: '48h', label: '48시간 (2일)' },
-                      ]
-                    : [
-                        { value: '24h', label: '24시간' },
-                        { value: '48h', label: '48시간' },
-                        { value: '1week', label: '1주일 (7일)' },
-                      ])
-                : [
-                    { value: '24h', label: '24시간' },
-                    { value: '48h', label: '48시간' },
-                    { value: '1week', label: '1주일' },
-                    { value: '1month', label: '1개월' },
-                  ]
-              ).map((opt) => (
+              {durationOptions.map((opt) => (
                 <div key={opt.value} className="duration-option">
                   <input
                     type="radio"
@@ -403,6 +444,16 @@ export default function UrlForm({ user, onResult }) {
                 </div>
               ))}
             </div>
+            {isLargeR2 && (
+              <p style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '6px', lineHeight: '1.4' }}>
+                🔥 1GB 초과 초대용량 파일은 스토리지 보관 기간에 맞춰 링크도 <strong>2일(48시간) 후 자동 종료</strong>됩니다.
+              </p>
+            )}
+            {isNormalR2 && (
+              <p style={{ fontSize: '0.8rem', color: '#10b981', marginTop: '6px', lineHeight: '1.4' }}>
+                ⚡ 3MB 초과 ~ 1GB 이하 대용량 파일은 스토리지 보관 기간에 맞춰 링크도 <strong>7일(1주일) 후 자동 종료</strong>됩니다.
+              </p>
+            )}
           </div>
         )}
 

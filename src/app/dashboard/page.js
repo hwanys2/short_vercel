@@ -89,10 +89,15 @@ export default function DashboardPage() {
           return;
         }
 
+        const fileExpireDuration =
+          newFile.size > 1024 * 1024 * 1024
+            ? '48h'
+            : (newFile.size >= 3 * 1024 * 1024 ? '1week' : '100years');
+
         await uploadShortFileAuto({
           file: newFile,
           customCode: newCode.trim(),
-          expireDuration: '100years',
+          expireDuration: fileExpireDuration,
           linkPasswordEnabled: false,
           onProgress: (prog) => {
             setUploadProgress(prog);
@@ -294,6 +299,16 @@ export default function DashboardPage() {
                             <span>⏱️</span>
                             <span><strong>보관 및 삭제 안내:</strong> {info.notice}</span>
                           </div>
+                          {newFile.size > 1024 * 1024 * 1024 && (
+                            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(239, 68, 68, 0.3)', color: '#ef4444', fontWeight: 600, fontSize: '0.82rem' }}>
+                              🔒 링크 만료 기간: <strong>2일 (48시간 후 종료)</strong> — 파일 저장 기간과 동일 적용
+                            </div>
+                          )}
+                          {newFile.size >= 3 * 1024 * 1024 && newFile.size <= 1024 * 1024 * 1024 && (
+                            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', color: '#047857', fontWeight: 600, fontSize: '0.82rem' }}>
+                              🔒 링크 만료 기간: <strong>7일 (1주일 후 종료)</strong> — 파일 저장 기간과 동일 적용
+                            </div>
+                          )}
                         </div>
                       );
                     })()}

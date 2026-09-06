@@ -21,26 +21,32 @@ export const runtime = 'nodejs';
 
 function calculateFileExpirationDate({ userId, expireDuration, fileSize }) {
   const size = Number(fileSize) || 0;
-  const isLarge = size > R2_LARGE_FOLDER_THRESHOLD_BYTES; // 1GB 초과
 
-  // 1GB 초과 파일은 자원 관리를 위해 최대 2일간 보관 후 자동 삭제
-  if (isLarge) {
-    const durations = {
-      '24h': 24 * 60 * 60 * 1000,
-      '48h': 48 * 60 * 60 * 1000,
-    };
-    const duration = durations[expireDuration] || 2 * 24 * 60 * 60 * 1000;
-    return new Date(Date.now() + Math.min(duration, 2 * 24 * 60 * 60 * 1000)).toISOString();
+  // 1. 1GB 초과 초대용량 파일: 스토리지 보관 기간(2일)과 일치시켜 무조건 2일(48시간) 후 링크 만료
+  if (size > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
+    return new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  // 1GB 이하 파일은 최대 7일간 보관 후 자동 삭제
+  // 2. 3MB 초과 ~ 1GB 이하 대용량 파일: 스토리지 보관 기간(7일)과 일치시켜 무조건 7일(1주일) 후 링크 만료
+  if (size >= R2_STORAGE_THRESHOLD_BYTES) {
+    return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  // 3. 3MB 미만 일반 파일 (Supabase Storage)
+  if (userId) {
+    // 회원은 영구 유지 (최근 3개월 미접속 시 정리)
+    return new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  // 비회원은 선택한 만료 기간 적용 (기본 1주일)
   const durations = {
     '24h': 24 * 60 * 60 * 1000,
     '48h': 48 * 60 * 60 * 1000,
     '1week': 7 * 24 * 60 * 60 * 1000,
+    '1month': 30 * 24 * 60 * 60 * 1000,
   };
   const duration = durations[expireDuration] || 7 * 24 * 60 * 60 * 1000;
-  return new Date(Date.now() + Math.min(duration, 7 * 24 * 60 * 60 * 1000)).toISOString();
+  return new Date(Date.now() + duration).toISOString();
 }
 
 export async function POST(request) {
