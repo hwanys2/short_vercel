@@ -6,48 +6,12 @@ import {
   FILE_SHARE_NOTICE_MEMBER,
   formatFileSize,
   MAX_FILE_BYTES,
-  R2_STORAGE_THRESHOLD_BYTES,
+  getFileCapacityRetentionInfo,
 } from '@/lib/shortFilesShared';
+import { uploadShortFileAuto } from '@/lib/fileUploadClient';
 
 const ACCEPT_ATTR =
   '.pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,.zip,.7z,.tar,.gz,.rar,application/pdf,text/plain,text/html,text/markdown,text/csv,image/*,application/zip,application/x-zip-compressed';
-
-function uploadToR2WithProgress(presignedUrl, file, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', presignedUrl, true);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        onProgress({
-          percent,
-          loaded: event.loaded,
-          total: event.total,
-        });
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-      } else {
-        reject(new Error(`R2 업로드 실패 (HTTP ${xhr.status})`));
-      }
-    };
-
-    xhr.onerror = () => {
-      reject(new Error('네트워크 오류로 R2 업로드에 실패했습니다. (CORS 또는 네트워크 상태를 확인하세요)'));
-    };
-
-    xhr.ontimeout = () => {
-      reject(new Error('R2 업로드 요청 시간이 초과되었습니다.'));
-    };
-
-    xhr.send(file);
-  });
-}
 
 export default function UrlForm({ user, onResult }) {
   const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'
@@ -96,118 +60,25 @@ export default function UrlForm({ user, onResult }) {
 
     try {
       if (mode === 'file') {
-        const isR2Upload = file.size >= R2_STORAGE_THRESHOLD_BYTES;
-
-        if (isR2Upload) {
-          // 1. Presigned URL 발급
-          setUploadProgress({
-            percent: 0,
-            statusText: '업로드 준비 중...',
-            detailText: 'Cloudflare R2 서명 URL 발급 중',
-          });
-
-          const presignRes = await fetch('/api/upload/r2-presign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileName: file.name,
-              fileSize: file.size,
-              fileType: file.type || 'application/octet-stream',
-              customCode: customCode.trim(),
-            }),
-          });
-
-          const presignData = await presignRes.json();
-          if (presignData.status !== 'success') {
-            setError(presignData.message || 'Presigned URL 발급에 실패했습니다.');
-            return;
-          }
-
-          const { presignedUrl, key, publicUrl, fileMime } = presignData.data;
-
-          // 2. R2로 직접 PUT 업로드 (브라우저 -> R2)
-          setUploadProgress({
-            percent: 0,
-            statusText: 'R2로 파일 업로드 중...',
-            detailText: `0% (0 B / ${formatFileSize(file.size)})`,
-          });
-
-          await uploadToR2WithProgress(presignedUrl, file, ({ percent, loaded, total }) => {
-            setUploadProgress({
-              percent,
-              statusText: 'R2로 파일 업로드 중...',
-              detailText: `${percent}% (${formatFileSize(loaded)} / ${formatFileSize(total)})`,
-            });
-          });
-
-          // 3. 완료 및 DB 등록
-          setUploadProgress({
-            percent: 100,
-            statusText: '단축 주소 생성 중...',
-            detailText: '데이터베이스에 링크 등록 중',
-          });
-
-          const completeRes = await fetch('/api/shorten-file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              key,
-              publicUrl,
-              fileName: file.name,
-              fileSize: file.size,
-              fileMime,
-              customCode: customCode.trim(),
-              expireDuration,
-              linkPasswordEnabled: passwordProtect,
-              linkPassword: passwordProtect ? linkPassword.trim() : '',
-            }),
-          });
-
-          const completeData = await completeRes.json();
-          if (completeData.status === 'success') {
-            onResult(completeData.data);
-            setFile(null);
-            setCustomCode('');
-            setPasswordProtect(false);
-            setLinkPassword('');
-            setConfirmPassword('');
-            if (e.target?.querySelector?.('#share-file')) {
-              e.target.querySelector('#share-file').value = '';
-            }
-          } else {
-            setError(completeData.message || '단축 주소 등록에 실패했습니다.');
-          }
-          return;
-        }
-
-        // 3MB 미만: 기존 Supabase FormData 업로드
-        const form = new FormData();
-        form.append('file', file);
-        form.append('custom_code', customCode.trim());
-        form.append('expire_duration', expireDuration);
-        form.append('link_password_enabled', passwordProtect ? 'true' : 'false');
-        if (passwordProtect) {
-          form.append('link_password', linkPassword.trim());
-        }
-
-        const res = await fetch('/api/shorten-file', {
-          method: 'POST',
-          body: form,
+        const result = await uploadShortFileAuto({
+          file,
+          customCode: customCode.trim(),
+          expireDuration,
+          linkPasswordEnabled: passwordProtect,
+          linkPassword: passwordProtect ? linkPassword.trim() : '',
+          onProgress: (progress) => {
+            setUploadProgress(progress);
+          },
         });
-        const data = await res.json();
 
-        if (data.status === 'success') {
-          onResult(data.data);
-          setFile(null);
-          setCustomCode('');
-          setPasswordProtect(false);
-          setLinkPassword('');
-          setConfirmPassword('');
-          if (e.target?.querySelector?.('#share-file')) {
-            e.target.querySelector('#share-file').value = '';
-          }
-        } else {
-          setError(data.message);
+        onResult(result.data);
+        setFile(null);
+        setCustomCode('');
+        setPasswordProtect(false);
+        setLinkPassword('');
+        setConfirmPassword('');
+        if (e.target?.querySelector?.('#share-file')) {
+          e.target.querySelector('#share-file').value = '';
         }
         return;
       }
@@ -353,7 +224,9 @@ export default function UrlForm({ user, onResult }) {
             </>
           ) : (
             <>
-              <label className="form-label" htmlFor="share-file">공유할 파일</label>
+              <label className="form-label" htmlFor="share-file">
+                공유할 파일 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>(최대 5GB 지원)</span>
+              </label>
               <input
                 id="share-file"
                 type="file"
@@ -362,22 +235,39 @@ export default function UrlForm({ user, onResult }) {
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 required
               />
-              {file && (
-                <div className="form-textarea-counter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{file.name} · {formatFileSize(file.size)}</span>
-                  {file.size >= R2_STORAGE_THRESHOLD_BYTES ? (
-                    <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.85rem' }}>
-                      ⚡ Cloudflare R2 직접 업로드
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      (일반 스토리지)
-                    </span>
-                  )}
-                </div>
-              )}
-              <p className="url-form-file-hint">
-                최대 {formatFileSize(MAX_FILE_BYTES)}. 문서, 이미지, 압축파일(ZIP 등) 지원. 3MB 이상 파일은 Cloudflare R2로 초고속 직접 업로드됩니다.
+
+              {/* 선택된 파일 상세 정보 및 용량별 자동 삭제 안내 배너 */}
+              {file && (() => {
+                const info = getFileCapacityRetentionInfo(file.size, Boolean(user));
+                return (
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      padding: '12px 14px',
+                      background: info.bgColor,
+                      border: `1px solid ${info.borderColor}`,
+                      borderRadius: '8px',
+                      fontSize: '0.88rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontWeight: '600', wordBreak: 'break-all' }}>{file.name}</span>
+                      <span style={{ fontWeight: '700', color: info.color, marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                        {formatFileSize(file.size)} ({info.badge})
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.45', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <span style={{ flexShrink: 0 }}>⏱️</span>
+                      <span><strong>보관 및 삭제 안내:</strong> {info.notice}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <p className="url-form-file-hint" style={{ marginTop: '8px', lineHeight: '1.5' }}>
+                📌 <strong>최대 5GB까지 모든 용량의 파일 공유 지원</strong> (문서, 이미지, ZIP 등).
+                <br />
+                용량별 수명 주기에 따라 1GB 이상 초대용량 파일은 자원 관리를 위해 빠르게 자동 삭제됩니다.
                 {' '}
                 {user ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
               </p>
@@ -504,7 +394,7 @@ export default function UrlForm({ user, onResult }) {
           </div>
         )}
 
-        {/* 업로드 진행률 바 (R2 대용량 업로드 시 표시) */}
+        {/* 업로드 진행률 바 (대용량 업로드 시 표시) */}
         {uploadProgress && (
           <div style={{ margin: '18px 0', padding: '14px', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600 }}>

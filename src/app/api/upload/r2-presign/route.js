@@ -21,7 +21,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           status: 'error',
-          message: 'Cloudflare R2 스토리지 설정이 완료되지 않았습니다. 관리자에게 문의하세요.',
+          message: 'Cloudflare R2 스토리지 환경변수가 설정되지 않았습니다. (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)',
         },
         { status: 503 }
       );
@@ -151,7 +151,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         status: 'error',
-        message: 'Presigned URL 발급 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        message: error?.message || 'Presigned URL 발급 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       },
       { status: 500 }
     );

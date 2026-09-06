@@ -31,12 +31,17 @@ export default function GuidePage() {
           <p>메인 페이지에서 &quot;텍스트 공유&quot; 탭을 선택해 긴 텍스트를 단축 주소로 공유할 수 있습니다.</p>
 
           <h2>3. 파일 공유</h2>
-          <p>문서·이미지 파일을 단축 주소로 공유할 수 있습니다. (최대 3MB)</p>
+          <p>문서·이미지·압축파일(ZIP 등)을 단축 주소로 공유할 수 있습니다. (최대 5GB 지원)</p>
           <ul>
-            <li>허용: PDF, Office, HWP, TXT/HTML/MD/CSV, 이미지(PNG/JPG/GIF/WEBP) 등</li>
-            <li>비회원: 선택한 만료 기간이 지나면 <strong>링크와 업로드 파일이 함께 삭제</strong>됩니다.</li>
-            <li>회원: URL·텍스트와 달리, 파일 공유만 <strong>최근 3개월간 접속이 없으면</strong> 링크와 파일이 자동 삭제됩니다.</li>
-            <li>개인정보 보호와 스토리지 용량을 위해 링크 소멸 시 파일도 함께 제거합니다.</li>
+            <li>허용: PDF, Office, HWP, TXT/HTML/MD/CSV, 이미지(PNG/JPG/GIF/WEBP), 압축파일(ZIP/7Z/TAR/GZ/RAR) 등</li>
+            <li><strong>용량별 수명 주기(자동 삭제) 규칙:</strong>
+              <ul style={{ marginTop: '6px' }}>
+                <li><strong>3MB 미만 (일반 파일):</strong> 비회원은 설정한 만료 기간 후, 회원은 최근 3개월 미접속 시 자동 삭제됩니다.</li>
+                <li><strong>3MB 이상 ~ 1GB 미만 (대용량):</strong> Cloudflare R2에 안전하게 보관되며, 수명 주기 정책에 따라 일정 기간 후 자동 삭제됩니다.</li>
+                <li><strong>1GB 이상 ~ 5GB (초대용량):</strong> 대용량 자원 관리를 위해 단기 보관(1~3일) 후 빠르게 자동 삭제됩니다.</li>
+              </ul>
+            </li>
+            <li>개인정보 보호와 스토리지 관리를 위해 링크 소멸 시 파일도 함께 완전히 제거됩니다.</li>
           </ul>
 
           <h2>4. 회원 URL 단축 (영구)</h2>

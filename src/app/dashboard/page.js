@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { buildShortUrl } from '@/lib/siteUrl';
+import {
+  formatFileSize,
+  MAX_FILE_BYTES,
+  getFileCapacityRetentionInfo,
+} from '@/lib/shortFilesShared';
+import { uploadShortFileAuto } from '@/lib/fileUploadClient';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -24,6 +30,7 @@ export default function DashboardPage() {
   const [newText, setNewText] = useState('');
   const [newFile, setNewFile] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
 
   // 회원탈퇴 모달
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -75,22 +82,31 @@ export default function DashboardPage() {
           setCreating(false);
           return;
         }
-        const form = new FormData();
-        form.append('file', newFile);
-        form.append('custom_code', newCode);
-        form.append('link_password_enabled', 'false');
-        const res = await fetch('/api/shorten-file', { method: 'POST', body: form });
-        const data = await res.json();
-        if (data.status === 'success') {
-          setMessage('파일 공유 주소가 성공적으로 생성되었습니다.');
-          setMessageType('success');
-          setNewCode('');
-          setNewFile(null);
-          fetchUrls();
-        } else {
-          setMessage(data.message);
+        if (newFile.size > MAX_FILE_BYTES) {
+          setMessage(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
           setMessageType('danger');
+          setCreating(false);
+          return;
         }
+
+        await uploadShortFileAuto({
+          file: newFile,
+          customCode: newCode.trim(),
+          expireDuration: '100years',
+          linkPasswordEnabled: false,
+          onProgress: (prog) => {
+            setUploadProgress(prog);
+          },
+        });
+
+        setMessage('파일 공유 주소가 성공적으로 생성되었습니다.');
+        setMessageType('success');
+        setNewCode('');
+        setNewFile(null);
+        if (document.getElementById('dash-file')) {
+          document.getElementById('dash-file').value = '';
+        }
+        fetchUrls();
         return;
       }
 
@@ -120,11 +136,12 @@ export default function DashboardPage() {
         setMessage(data.message);
         setMessageType('danger');
       }
-    } catch {
-      setMessage('오류가 발생했습니다.');
+    } catch (err) {
+      setMessage(err?.message || '오류가 발생했습니다.');
       setMessageType('danger');
     } finally {
       setCreating(false);
+      setUploadProgress(null);
     }
   };
 
@@ -237,17 +254,47 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="form-group dashboard-create-main">
-                    <label className="form-label" htmlFor="dash-file">공유할 파일 (최대 3MB)</label>
+                    <label className="form-label" htmlFor="dash-file">
+                      공유할 파일 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>(최대 5GB 지원)</span>
+                    </label>
                     <input
                       id="dash-file"
                       type="file"
                       className="form-input"
-                      accept=".pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp"
+                      accept=".pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,.zip,.7z,.tar,.gz,.rar,application/zip,application/x-zip-compressed"
                       onChange={(e) => setNewFile(e.target.files?.[0] || null)}
                       required
                     />
-                    <p className="url-form-file-hint">
-                      최근 3개월 미접속 시 링크와 파일이 자동 삭제됩니다.
+
+                    {newFile && (() => {
+                      const info = getFileCapacityRetentionInfo(newFile.size, true);
+                      return (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            padding: '10px 12px',
+                            background: info.bgColor,
+                            border: `1px solid ${info.borderColor}`,
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: '600', wordBreak: 'break-all' }}>{newFile.name}</span>
+                            <span style={{ fontWeight: '700', color: info.color, marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                              {formatFileSize(newFile.size)} ({info.badge})
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.4', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                            <span>⏱️</span>
+                            <span><strong>보관 및 삭제 안내:</strong> {info.notice}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <p className="url-form-file-hint" style={{ marginTop: '6px' }}>
+                      최대 5GB까지 지원. 용량에 따라 보관 수명 주기가 적용되며, 1GB 이상 초대용량 파일은 자원 관리를 위해 빠르게 자동 삭제됩니다.
                     </p>
                   </div>
                 )}
@@ -258,8 +305,33 @@ export default function DashboardPage() {
                     <input id="dash-code" type="text" className="form-input" placeholder="원하는코드" value={newCode} onChange={(e) => setNewCode(e.target.value)} required />
                   </div>
                 </div>
+
+                {uploadProgress && (
+                  <div style={{ width: '100%', margin: '12px 0', padding: '12px', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '6px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                      <span>{uploadProgress.statusText}</span>
+                      <span style={{ color: '#2563eb' }}>{uploadProgress.percent}%</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${uploadProgress.percent}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                          transition: 'width 0.2s ease',
+                        }}
+                      />
+                    </div>
+                    {uploadProgress.detailText && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', marginTop: '4px', textAlign: 'right' }}>
+                        {uploadProgress.detailText}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <button type="submit" className="btn btn-primary dashboard-create-submit" disabled={creating}>
-                  {creating ? '생성 중...' : '생성'}
+                  {creating ? (uploadProgress?.statusText || '생성 중...') : '생성'}
                 </button>
               </form>
             </div>

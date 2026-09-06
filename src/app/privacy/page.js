@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>회원가입 시:</strong> 닉네임, 이메일, 비밀번호(암호화 저장)</li>
             <li><strong>서비스 이용 시:</strong> URL 접속 기록, 방문 횟수</li>
-            <li><strong>파일 공유 시:</strong> 업로드한 파일(문서·이미지 등, 최대 3MB) 및 파일명·크기 메타데이터</li>
+            <li><strong>파일 공유 시:</strong> 업로드한 파일(문서·이미지·압축파일 등, 최대 5GB) 및 파일명·크기 메타데이터</li>
           </ul>
 
           <h2>2. 개인정보의 이용 목적</h2>
