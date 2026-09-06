@@ -1,12 +1,16 @@
 export const SHORT_FILES_BUCKET_DEFAULT = 'short_files';
 
-export const MAX_FILE_BYTES = 3 * 1024 * 1024; // 3MB
+export const SUPABASE_STORAGE_MAX_BYTES = 3 * 1024 * 1024; // 3MB
+export const R2_STORAGE_THRESHOLD_BYTES = 3 * 1024 * 1024; // 3MB
+export const R2_LARGE_FOLDER_THRESHOLD_BYTES = 1024 * 1024 * 1024; // 1GB
+export const MAX_FILE_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
 
 export function formatFileSize(bytes) {
   const n = Number(bytes) || 0;
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 export const FILE_SHARE_NOTICE_GUEST =

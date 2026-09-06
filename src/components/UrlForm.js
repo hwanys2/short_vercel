@@ -1,10 +1,53 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { FILE_SHARE_NOTICE_GUEST, FILE_SHARE_NOTICE_MEMBER, formatFileSize, MAX_FILE_BYTES } from '@/lib/shortFilesShared';
+import {
+  FILE_SHARE_NOTICE_GUEST,
+  FILE_SHARE_NOTICE_MEMBER,
+  formatFileSize,
+  MAX_FILE_BYTES,
+  R2_STORAGE_THRESHOLD_BYTES,
+} from '@/lib/shortFilesShared';
 
 const ACCEPT_ATTR =
-  '.pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,application/pdf,text/plain,text/html,text/markdown,text/csv,image/*';
+  '.pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,.zip,.7z,.tar,.gz,.rar,application/pdf,text/plain,text/html,text/markdown,text/csv,image/*,application/zip,application/x-zip-compressed';
+
+function uploadToR2WithProgress(presignedUrl, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', presignedUrl, true);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress({
+          percent,
+          loaded: event.loaded,
+          total: event.total,
+        });
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`R2 업로드 실패 (HTTP ${xhr.status})`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('네트워크 오류로 R2 업로드에 실패했습니다. (CORS 또는 네트워크 상태를 확인하세요)'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('R2 업로드 요청 시간이 초과되었습니다.'));
+    };
+
+    xhr.send(file);
+  });
+}
 
 export default function UrlForm({ user, onResult }) {
   const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'
@@ -17,6 +60,7 @@ export default function UrlForm({ user, onResult }) {
   const [linkPassword, setLinkPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState('');
 
   const baseUrl = '숏.한국/';
@@ -52,9 +96,94 @@ export default function UrlForm({ user, onResult }) {
 
     try {
       if (mode === 'file') {
+        const isR2Upload = file.size >= R2_STORAGE_THRESHOLD_BYTES;
+
+        if (isR2Upload) {
+          // 1. Presigned URL 발급
+          setUploadProgress({
+            percent: 0,
+            statusText: '업로드 준비 중...',
+            detailText: 'Cloudflare R2 서명 URL 발급 중',
+          });
+
+          const presignRes = await fetch('/api/upload/r2-presign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileSize: file.size,
+              fileType: file.type || 'application/octet-stream',
+              customCode: customCode.trim(),
+            }),
+          });
+
+          const presignData = await presignRes.json();
+          if (presignData.status !== 'success') {
+            setError(presignData.message || 'Presigned URL 발급에 실패했습니다.');
+            return;
+          }
+
+          const { presignedUrl, key, publicUrl, fileMime } = presignData.data;
+
+          // 2. R2로 직접 PUT 업로드 (브라우저 -> R2)
+          setUploadProgress({
+            percent: 0,
+            statusText: 'R2로 파일 업로드 중...',
+            detailText: `0% (0 B / ${formatFileSize(file.size)})`,
+          });
+
+          await uploadToR2WithProgress(presignedUrl, file, ({ percent, loaded, total }) => {
+            setUploadProgress({
+              percent,
+              statusText: 'R2로 파일 업로드 중...',
+              detailText: `${percent}% (${formatFileSize(loaded)} / ${formatFileSize(total)})`,
+            });
+          });
+
+          // 3. 완료 및 DB 등록
+          setUploadProgress({
+            percent: 100,
+            statusText: '단축 주소 생성 중...',
+            detailText: '데이터베이스에 링크 등록 중',
+          });
+
+          const completeRes = await fetch('/api/shorten-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              key,
+              publicUrl,
+              fileName: file.name,
+              fileSize: file.size,
+              fileMime,
+              customCode: customCode.trim(),
+              expireDuration,
+              linkPasswordEnabled: passwordProtect,
+              linkPassword: passwordProtect ? linkPassword.trim() : '',
+            }),
+          });
+
+          const completeData = await completeRes.json();
+          if (completeData.status === 'success') {
+            onResult(completeData.data);
+            setFile(null);
+            setCustomCode('');
+            setPasswordProtect(false);
+            setLinkPassword('');
+            setConfirmPassword('');
+            if (e.target?.querySelector?.('#share-file')) {
+              e.target.querySelector('#share-file').value = '';
+            }
+          } else {
+            setError(completeData.message || '단축 주소 등록에 실패했습니다.');
+          }
+          return;
+        }
+
+        // 3MB 미만: 기존 Supabase FormData 업로드
         const form = new FormData();
         form.append('file', file);
-        form.append('custom_code', customCode);
+        form.append('custom_code', customCode.trim());
         form.append('expire_duration', expireDuration);
         form.append('link_password_enabled', passwordProtect ? 'true' : 'false');
         if (passwordProtect) {
@@ -84,7 +213,7 @@ export default function UrlForm({ user, onResult }) {
       }
 
       const body = {
-        custom_code: customCode,
+        custom_code: customCode.trim(),
         expire_duration: expireDuration,
         type: mode,
       };
@@ -119,10 +248,12 @@ export default function UrlForm({ user, onResult }) {
       } else {
         setError(data.message);
       }
-    } catch {
-      setError('네트워크 오류가 발생했습니다.');
+    } catch (err) {
+      console.error('Shorten error:', err);
+      setError(err?.message || '네트워크 오류가 발생했습니다.');
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -232,12 +363,21 @@ export default function UrlForm({ user, onResult }) {
                 required
               />
               {file && (
-                <div className="form-textarea-counter">
-                  {file.name} · {formatFileSize(file.size)}
+                <div className="form-textarea-counter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{file.name} · {formatFileSize(file.size)}</span>
+                  {file.size >= R2_STORAGE_THRESHOLD_BYTES ? (
+                    <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.85rem' }}>
+                      ⚡ Cloudflare R2 직접 업로드
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      (일반 스토리지)
+                    </span>
+                  )}
                 </div>
               )}
               <p className="url-form-file-hint">
-                최대 {formatFileSize(MAX_FILE_BYTES)}. 문서(PDF, Office, HWP, TXT 등)와 이미지만 가능합니다.
+                최대 {formatFileSize(MAX_FILE_BYTES)}. 문서, 이미지, 압축파일(ZIP 등) 지원. 3MB 이상 파일은 Cloudflare R2로 초고속 직접 업로드됩니다.
                 {' '}
                 {user ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
               </p>
@@ -266,63 +406,63 @@ export default function UrlForm({ user, onResult }) {
         <div className="url-form-member-options">
           <div className="url-form-member-options-inner">
             <label className="url-form-password-toggle" htmlFor="home-link-password-enabled">
-                <input
-                  id="home-link-password-enabled"
-                  type="checkbox"
-                  checked={passwordProtect}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setPasswordProtect(on);
-                    if (!on) {
-                      setLinkPassword('');
-                      setConfirmPassword('');
-                    }
-                  }}
-                />
-                <span className="url-form-password-toggle-text">
-                  <span className="url-form-password-toggle-title">비밀번호로 보호</span>
-                  <span className="url-form-password-toggle-desc">
-                    단축 링크를 연 사람에게 비밀번호를 요청합니다
-                  </span>
+              <input
+                id="home-link-password-enabled"
+                type="checkbox"
+                checked={passwordProtect}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setPasswordProtect(on);
+                  if (!on) {
+                    setLinkPassword('');
+                    setConfirmPassword('');
+                  }
+                }}
+              />
+              <span className="url-form-password-toggle-text">
+                <span className="url-form-password-toggle-title">비밀번호로 보호</span>
+                <span className="url-form-password-toggle-desc">
+                  단축 링크를 연 사람에게 비밀번호를 요청합니다
                 </span>
-              </label>
-              <div
-                className={`url-form-password-reveal${passwordProtect ? ' is-open' : ''}`}
-                aria-hidden={!passwordProtect}
-              >
-                <div className="url-form-password-fields">
-                  <div className="form-group url-form-password-field-group">
-                    <label className="form-label" htmlFor="home-link-password">
-                      링크 비밀번호
-                    </label>
-                    <input
-                      id="home-link-password"
-                      type="password"
-                      className="form-input"
-                      autoComplete="new-password"
-                      placeholder="6자 이상"
-                      value={linkPassword}
-                      onChange={(e) => setLinkPassword(e.target.value)}
-                      disabled={!passwordProtect}
-                    />
-                  </div>
-                  <div className="form-group url-form-password-field-group">
-                    <label className="form-label" htmlFor="home-link-password-confirm">
-                      비밀번호 확인
-                    </label>
-                    <input
-                      id="home-link-password-confirm"
-                      type="password"
-                      className="form-input"
-                      autoComplete="new-password"
-                      placeholder="한 번 더 입력하세요"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      disabled={!passwordProtect}
-                    />
-                  </div>
+              </span>
+            </label>
+            <div
+              className={`url-form-password-reveal${passwordProtect ? ' is-open' : ''}`}
+              aria-hidden={!passwordProtect}
+            >
+              <div className="url-form-password-fields">
+                <div className="form-group url-form-password-field-group">
+                  <label className="form-label" htmlFor="home-link-password">
+                    링크 비밀번호
+                  </label>
+                  <input
+                    id="home-link-password"
+                    type="password"
+                    className="form-input"
+                    autoComplete="new-password"
+                    placeholder="6자 이상"
+                    value={linkPassword}
+                    onChange={(e) => setLinkPassword(e.target.value)}
+                    disabled={!passwordProtect}
+                  />
+                </div>
+                <div className="form-group url-form-password-field-group">
+                  <label className="form-label" htmlFor="home-link-password-confirm">
+                    비밀번호 확인
+                  </label>
+                  <input
+                    id="home-link-password-confirm"
+                    type="password"
+                    className="form-input"
+                    autoComplete="new-password"
+                    placeholder="한 번 더 입력하세요"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={!passwordProtect}
+                  />
                 </div>
               </div>
+            </div>
             {!user && passwordProtect && (
               <p className="url-form-guest-password-note">
                 비밀번호는 링크 생성 시에만 설정할 수 있습니다. 이후 변경이 필요하면{' '}
@@ -364,11 +504,36 @@ export default function UrlForm({ user, onResult }) {
           </div>
         )}
 
+        {/* 업로드 진행률 바 (R2 대용량 업로드 시 표시) */}
+        {uploadProgress && (
+          <div style={{ margin: '18px 0', padding: '14px', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600 }}>
+              <span>{uploadProgress.statusText}</span>
+              <span style={{ color: '#2563eb' }}>{uploadProgress.percent}%</span>
+            </div>
+            <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${uploadProgress.percent}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                  transition: 'width 0.2s ease',
+                }}
+              />
+            </div>
+            {uploadProgress.detailText && (
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', marginTop: '6px', textAlign: 'right' }}>
+                {uploadProgress.detailText}
+              </div>
+            )}
+          </div>
+        )}
+
         {error && <div className="alert alert-danger">⚠️ {error}</div>}
 
         <button type="submit" className="btn btn-primary btn-shorten" disabled={loading}>
           {loading ? (
-            <><span className="spinner" /> 처리 중...</>
+            <><span className="spinner" /> {uploadProgress?.statusText || '처리 중...'}</>
           ) : mode === 'url' ? (
             <>🔗 URL 단축하기</>
           ) : mode === 'text' ? (

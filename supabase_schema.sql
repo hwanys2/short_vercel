@@ -107,10 +107,11 @@ ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS link_password_unlock_version INT
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS type VARCHAR(10) NOT NULL DEFAULT 'url';
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS text_content TEXT;
 
--- 파일 공유 기능 지원
+-- 파일 공유 기능 지원 (대용량 파일 저장을 위해 BIGINT 권장)
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_path TEXT;
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_name TEXT;
-ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_size INTEGER;
+ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_size BIGINT;
+ALTER TABLE short_urls ALTER COLUMN file_size TYPE BIGINT;
 ALTER TABLE short_urls ADD COLUMN IF NOT EXISTS file_mime TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_short_urls_file_cleanup

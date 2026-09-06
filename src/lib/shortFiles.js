@@ -1,12 +1,13 @@
 import { randomUUID } from 'crypto';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from './supabase.js';
+import { isR2Key, deleteR2Object, deleteR2Objects } from './r2.js';
 import {
   FILE_SHARE_NOTICE_GUEST,
   FILE_SHARE_NOTICE_MEMBER,
   formatFileSize,
   MAX_FILE_BYTES,
   SHORT_FILES_BUCKET_DEFAULT,
-} from '@/lib/shortFilesShared';
+} from './shortFilesShared.js';
 
 export {
   FILE_SHARE_NOTICE_GUEST,
@@ -19,7 +20,7 @@ export const SHORT_FILES_BUCKET =
   (typeof process !== 'undefined' && process.env.SHORT_FILES_BUCKET?.trim()) ||
   SHORT_FILES_BUCKET_DEFAULT;
 
-/** MIME types we accept for light document / image sharing */
+/** MIME types we accept for light document / image sharing / archives */
 export const ALLOWED_FILE_MIMES = new Set([
   'application/pdf',
   'text/plain',
@@ -44,6 +45,15 @@ export const ALLOWED_FILE_MIMES = new Set([
   'image/jpg',
   'image/gif',
   'image/webp',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-7z-compressed',
+  'application/x-tar',
+  'application/gzip',
+  'application/x-gzip',
+  'application/vnd.rar',
+  'application/x-rar-compressed',
+  'application/octet-stream',
 ]);
 
 const EXT_MIME_FALLBACK = {
@@ -68,6 +78,11 @@ const EXT_MIME_FALLBACK = {
   jpeg: 'image/jpeg',
   gif: 'image/gif',
   webp: 'image/webp',
+  zip: 'application/zip',
+  '7z': 'application/x-7z-compressed',
+  tar: 'application/x-tar',
+  gz: 'application/gzip',
+  rar: 'application/vnd.rar',
 };
 
 const ALLOWED_EXTENSIONS = new Set(Object.keys(EXT_MIME_FALLBACK));
@@ -108,7 +123,7 @@ export function normalizeDisplayFileName(filename) {
 
 /**
  * Resolve MIME: prefer browser type when allowed; else extension fallback.
- * Rejects unknown / blocked types. `application/octet-stream` only for hwp/hwpx.
+ * Rejects unknown / blocked types. `application/octet-stream` only for hwp/hwpx and archives.
  */
 export function resolveAllowedMime(file) {
   const name = file?.name || '';
@@ -122,20 +137,22 @@ export function resolveAllowedMime(file) {
     return {
       ok: false,
       message:
-        '허용되지 않는 파일 형식입니다. 문서(PDF, Office, HWP, TXT 등) 또는 이미지만 업로드할 수 있습니다.',
+        '허용되지 않는 파일 형식입니다. 문서(PDF, Office, HWP, TXT 등), 이미지, 압축 파일(ZIP 등)만 업로드할 수 있습니다.',
     };
   }
 
   const byExt = EXT_MIME_FALLBACK[ext];
+  const ALLOW_OCTET_EXTS = new Set(['hwp', 'hwpx', 'zip', '7z', 'tar', 'gz', 'rar']);
+
   if (declared && ALLOWED_FILE_MIMES.has(declared)) {
-    // octet-stream only accepted for Korean office docs
-    if (declared === 'application/octet-stream' && ext !== 'hwp' && ext !== 'hwpx') {
+    // octet-stream only accepted for Korean office docs or archive files
+    if (declared === 'application/octet-stream' && !ALLOW_OCTET_EXTS.has(ext)) {
       return { ok: false, message: '허용되지 않는 파일 형식입니다.' };
     }
     return { ok: true, mime: declared === 'image/jpg' ? 'image/jpeg' : declared };
   }
 
-  if (declared === 'application/octet-stream' && (ext === 'hwp' || ext === 'hwpx')) {
+  if (declared === 'application/octet-stream' && ALLOW_OCTET_EXTS.has(ext)) {
     return { ok: true, mime: byExt };
   }
 
@@ -147,7 +164,7 @@ export function resolveAllowedMime(file) {
   return {
     ok: false,
     message:
-      '허용되지 않는 파일 형식입니다. 문서(PDF, Office, HWP, TXT 등) 또는 이미지만 업로드할 수 있습니다.',
+      '허용되지 않는 파일 형식입니다. 문서(PDF, Office, HWP, TXT 등), 이미지, 압축 파일(ZIP 등)만 업로드할 수 있습니다.',
   };
 }
 
@@ -199,6 +216,10 @@ export async function uploadShortFile({ file, path, mime }) {
 
 export async function deleteShortFile(filePath) {
   if (!filePath) return;
+  if (isR2Key(filePath)) {
+    await deleteR2Object(filePath);
+    return;
+  }
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.storage.from(SHORT_FILES_BUCKET).remove([filePath]);
   if (error) {
@@ -209,14 +230,24 @@ export async function deleteShortFile(filePath) {
 export async function deleteShortFiles(filePaths) {
   const paths = (filePaths || []).filter(Boolean);
   if (paths.length === 0) return;
-  const supabase = getSupabaseAdmin();
-  // Supabase remove accepts batches; chunk to be safe
-  const chunkSize = 100;
-  for (let i = 0; i < paths.length; i += chunkSize) {
-    const chunk = paths.slice(i, i + chunkSize);
-    const { error } = await supabase.storage.from(SHORT_FILES_BUCKET).remove(chunk);
-    if (error) {
-      console.error('Storage batch delete error:', error);
+
+  const r2Paths = paths.filter((p) => isR2Key(p));
+  const supabasePaths = paths.filter((p) => !isR2Key(p));
+
+  if (r2Paths.length > 0) {
+    await deleteR2Objects(r2Paths);
+  }
+
+  if (supabasePaths.length > 0) {
+    const supabase = getSupabaseAdmin();
+    // Supabase remove accepts batches; chunk to be safe
+    const chunkSize = 100;
+    for (let i = 0; i < supabasePaths.length; i += chunkSize) {
+      const chunk = supabasePaths.slice(i, i + chunkSize);
+      const { error } = await supabase.storage.from(SHORT_FILES_BUCKET).remove(chunk);
+      if (error) {
+        console.error('Storage batch delete error:', error);
+      }
     }
   }
 }

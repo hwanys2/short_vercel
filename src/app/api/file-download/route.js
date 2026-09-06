@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 import { createSignedDownloadUrl } from '@/lib/shortFiles';
+import { isR2Key, getR2PublicUrl } from '@/lib/r2';
 
 export async function GET(request) {
   try {
@@ -35,7 +36,7 @@ export async function GET(request) {
       const { data } = await supabase
         .from('short_urls')
         .select(
-          'id, type, code, file_name, file_path, link_password_hash, link_password_unlock_version'
+          'id, original_url, type, code, file_name, file_path, link_password_hash, link_password_unlock_version'
         )
         .eq('code', normalizedCode)
         .eq('user_id', user.id)
@@ -47,7 +48,7 @@ export async function GET(request) {
       const { data } = await supabase
         .from('short_urls')
         .select(
-          'id, type, code, file_name, file_path, link_password_hash, link_password_unlock_version'
+          'id, original_url, type, code, file_name, file_path, link_password_hash, link_password_unlock_version'
         )
         .eq('code', normalizedCode)
         .is('user_id', null)
@@ -72,6 +73,13 @@ export async function GET(request) {
       }
     }
 
+    // Cloudflare R2 파일인 경우 R2 퍼블릭 URL로 302 리다이렉트
+    if (isR2Key(urlData.file_path)) {
+      const targetUrl = getR2PublicUrl(urlData.file_path) || urlData.original_url;
+      return NextResponse.redirect(targetUrl, 302);
+    }
+
+    // Supabase Storage 파일인 경우 Signed URL 발급 후 리다이렉트
     const signedUrl = await createSignedDownloadUrl(urlData.file_path, 120, urlData.file_name);
     return NextResponse.redirect(signedUrl, 302);
   } catch (error) {

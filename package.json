@@ -10,6 +10,8 @@
     "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@supabase/supabase-js": "^2.103.0",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
