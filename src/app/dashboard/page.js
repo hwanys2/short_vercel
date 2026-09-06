@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
@@ -31,6 +31,27 @@ export default function DashboardPage() {
   const [newFile, setNewFile] = useState(null);
   const [creating, setCreating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
+  const abortControllerRef = useRef(null);
+
+  // 업로드 도중 창 닫기/새로고침 방지
+  useEffect(() => {
+    if (!creating || !uploadProgress) return;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [creating, uploadProgress]);
+
+  const handleCancelUpload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
 
   // 회원탈퇴 모달
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -94,6 +115,9 @@ export default function DashboardPage() {
             ? '48h'
             : (newFile.size >= 3 * 1024 * 1024 ? '1week' : '100years');
 
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+
         await uploadShortFileAuto({
           file: newFile,
           customCode: newCode.trim(),
@@ -102,6 +126,7 @@ export default function DashboardPage() {
           onProgress: (prog) => {
             setUploadProgress(prog);
           },
+          signal: abortController.signal,
         });
 
         setMessage('파일 공유 주소가 성공적으로 생성되었습니다.');
@@ -142,9 +167,15 @@ export default function DashboardPage() {
         setMessageType('danger');
       }
     } catch (err) {
-      setMessage(err?.message || '오류가 발생했습니다.');
-      setMessageType('danger');
+      if (err?.name === 'AbortError' || err?.message?.includes('취소')) {
+        setMessage('파일 업로드가 취소되었습니다.');
+        setMessageType('warning');
+      } else {
+        setMessage(err?.message || '오류가 발생했습니다.');
+        setMessageType('danger');
+      }
     } finally {
+      abortControllerRef.current = null;
       setCreating(false);
       setUploadProgress(null);
     }
@@ -352,11 +383,32 @@ export default function DashboardPage() {
                         }}
                       />
                     </div>
-                    {uploadProgress.detailText && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', marginTop: '4px', textAlign: 'right' }}>
-                        {uploadProgress.detailText}
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={handleCancelUpload}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '0.75rem',
+                          background: 'none',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef4444'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                      >
+                        ✕ 업로드 취소
+                      </button>
+                      {uploadProgress.detailText && (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', textAlign: 'right' }}>
+                          {uploadProgress.detailText}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

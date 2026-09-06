@@ -3,9 +3,34 @@ import { R2_STORAGE_THRESHOLD_BYTES, formatFileSize } from './shortFilesShared.j
 /**
  * XHR 기반 R2 직접 PUT 업로드 및 실시간 진행률 콜백
  */
-export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType) {
+export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType, signal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    let isAborted = false;
+
+    const handleAbort = () => {
+      isAborted = true;
+      try {
+        xhr.abort();
+      } catch {}
+      const err = new Error('업로드가 취소되었습니다.');
+      err.name = 'AbortError';
+      reject(err);
+    };
+
+    if (signal) {
+      if (signal.aborted) {
+        return handleAbort();
+      }
+      signal.addEventListener('abort', handleAbort, { once: true });
+    }
+
+    const cleanupSignal = () => {
+      if (signal) {
+        signal.removeEventListener('abort', handleAbort);
+      }
+    };
+
     xhr.open('PUT', presignedUrl, true);
     const ct = mimeType || file.type || 'application/octet-stream';
     xhr.setRequestHeader('Content-Type', ct);
@@ -22,6 +47,7 @@ export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType)
     };
 
     xhr.onload = () => {
+      cleanupSignal();
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
@@ -30,11 +56,24 @@ export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType)
     };
 
     xhr.onerror = () => {
+      cleanupSignal();
+      if (isAborted) return;
       reject(new Error('네트워크 또는 CORS 오류로 Cloudflare R2 업로드에 실패했습니다. Cloudflare R2 버킷의 CORS 설정(PUT 메서드 및 도메인 허용)을 확인해주세요.'));
     };
 
     xhr.ontimeout = () => {
+      cleanupSignal();
+      if (isAborted) return;
       reject(new Error('R2 업로드 요청 시간이 초과되었습니다.'));
+    };
+
+    xhr.onabort = () => {
+      cleanupSignal();
+      if (!isAborted) {
+        const err = new Error('업로드가 취소되었습니다.');
+        err.name = 'AbortError';
+        reject(err);
+      }
     };
 
     xhr.send(file);
@@ -51,6 +90,7 @@ export async function uploadShortFileAuto({
   linkPasswordEnabled = false,
   linkPassword = '',
   onProgress,
+  signal,
 }) {
   const isR2Upload = file.size >= R2_STORAGE_THRESHOLD_BYTES;
 
@@ -73,6 +113,7 @@ export async function uploadShortFileAuto({
         fileType: file.type || 'application/octet-stream',
         customCode: customCode.trim(),
       }),
+      signal,
     });
 
     const presignData = await presignRes.json();
@@ -103,7 +144,8 @@ export async function uploadShortFileAuto({
           });
         }
       },
-      fileMime
+      fileMime,
+      signal
     );
 
     // 3. 완료 및 DB 등록
@@ -129,6 +171,7 @@ export async function uploadShortFileAuto({
         linkPasswordEnabled,
         linkPassword: linkPasswordEnabled ? linkPassword.trim() : '',
       }),
+      signal,
     });
 
     const completeData = await completeRes.json();
@@ -152,6 +195,7 @@ export async function uploadShortFileAuto({
   const res = await fetch('/api/shorten-file', {
     method: 'POST',
     body: form,
+    signal,
   });
 
   const data = await res.json();

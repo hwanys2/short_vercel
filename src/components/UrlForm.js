@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FILE_SHARE_NOTICE_GUEST,
   FILE_SHARE_NOTICE_MEMBER,
@@ -26,6 +26,27 @@ export default function UrlForm({ user, onResult }) {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState('');
+  const abortControllerRef = useRef(null);
+
+  // 업로드 도중 사용자가 실수로 탭을 닫거나 새로고침하는 것을 방지
+  useEffect(() => {
+    if (!loading || !uploadProgress) return;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [loading, uploadProgress]);
+
+  const handleCancelUpload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
 
   const baseUrl = '숏.한국/';
   const prefix = user ? `${baseUrl}${user.username}/` : baseUrl;
@@ -60,6 +81,9 @@ export default function UrlForm({ user, onResult }) {
 
     try {
       if (mode === 'file') {
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+
         const result = await uploadShortFileAuto({
           file,
           customCode: customCode.trim(),
@@ -69,6 +93,7 @@ export default function UrlForm({ user, onResult }) {
           onProgress: (progress) => {
             setUploadProgress(progress);
           },
+          signal: abortController.signal,
         });
 
         onResult(result.data);
@@ -120,9 +145,14 @@ export default function UrlForm({ user, onResult }) {
         setError(data.message);
       }
     } catch (err) {
-      console.error('Shorten error:', err);
-      setError(err?.message || '네트워크 오류가 발생했습니다.');
+      if (err?.name === 'AbortError' || err?.message?.includes('취소')) {
+        setError('파일 업로드가 취소되었습니다.');
+      } else {
+        console.error('Shorten error:', err);
+        setError(err?.message || '네트워크 오류가 발생했습니다.');
+      }
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
       setUploadProgress(null);
     }
@@ -474,11 +504,32 @@ export default function UrlForm({ user, onResult }) {
                 }}
               />
             </div>
-            {uploadProgress.detailText && (
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', marginTop: '6px', textAlign: 'right' }}>
-                {uploadProgress.detailText}
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={handleCancelUpload}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  background: 'none',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef4444'; }}
+                onMouseOut={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              >
+                ✕ 업로드 취소
+              </button>
+              {uploadProgress.detailText && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', textAlign: 'right' }}>
+                  {uploadProgress.detailText}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

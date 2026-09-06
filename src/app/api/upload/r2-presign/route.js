@@ -7,6 +7,7 @@ import {
   formatFileSize,
   MAX_FILE_BYTES,
   R2_STORAGE_THRESHOLD_BYTES,
+  R2_LARGE_FOLDER_THRESHOLD_BYTES,
 } from '@/lib/shortFilesShared';
 import {
   normalizeDisplayFileName,
@@ -131,11 +132,14 @@ export async function POST(request) {
     }
 
     // Presigned PUT URL 발급
+    // 5GB 초대용량 파일 및 느린 업로드 회선 환경을 고려하여 넉넉한 만료 시간(4시간~6시간) 부여
+    const expiresIn = size > R2_LARGE_FOLDER_THRESHOLD_BYTES ? 6 * 3600 : 4 * 3600;
+
     const { presignedUrl, key, publicUrl } = await createR2PresignedUploadUrl({
       fileName: cleanFileName,
       fileSize: size,
       mimeType: mimeResult.mime,
-      expiresIn: 3600, // 1시간
+      expiresIn,
     });
 
     return NextResponse.json({
