@@ -10,9 +10,6 @@ import {
 } from '@/lib/shortFilesShared';
 import { uploadShortFileAuto } from '@/lib/fileUploadClient';
 
-const ACCEPT_ATTR =
-  '.pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,.zip,.7z,.tar,.gz,.rar,application/pdf,text/plain,text/html,text/markdown,text/csv,image/*,application/zip,application/x-zip-compressed';
-
 export default function UrlForm({ user, onResult }) {
   const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'
   const [originalUrl, setOriginalUrl] = useState('');
@@ -159,8 +156,19 @@ export default function UrlForm({ user, onResult }) {
   };
 
   const handleFileChange = (selectedFile) => {
+    setError('');
     setFile(selectedFile);
     if (!selectedFile) return;
+
+    const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+    const blockedExts = ['exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'dll', 'sys', 'apk', 'dmg', 'pkg', 'iso', 'sh', 'ps1', 'vbs', 'jar', 'js', 'mjs', 'cjs', 'php', 'asp', 'aspx', 'jsp', 'cgi', 'svg'];
+    if (ext && blockedExts.includes(ext)) {
+      setError('보안상 직접 실행 파일(.exe, .apk, .dmg 등) 및 스크립트는 업로드할 수 없습니다. 프로그램 공유는 ZIP 압축 파일로 묶어서 업로드해주세요.');
+      setFile(null);
+      const fileInput = document.getElementById('share-file');
+      if (fileInput) fileInput.value = '';
+      return;
+    }
 
     if (selectedFile.size > 1024 * 1024 * 1024) {
       setExpireDuration('48h');
@@ -303,7 +311,6 @@ export default function UrlForm({ user, onResult }) {
                 id="share-file"
                 type="file"
                 className="form-input"
-                accept={ACCEPT_ATTR}
                 onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
                 required
               />
@@ -337,7 +344,7 @@ export default function UrlForm({ user, onResult }) {
               })()}
 
               <p className="url-form-file-hint" style={{ marginTop: '8px', lineHeight: '1.5' }}>
-                📌 <strong>최대 5GB까지 모든 용량의 파일 공유 지원</strong> (문서, 이미지, ZIP 등).
+                📌 <strong>최대 5GB까지 모든 파일 공유 지원</strong> (동영상, 문서, 이미지, ZIP 등. 실행 파일은 ZIP 압축 권장).
                 <br />
                 스토리지 자원 관리를 위해 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
                 {' '}

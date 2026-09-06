@@ -53,6 +53,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleFileChange = (file) => {
+    setMessage('');
+    setNewFile(file);
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const blockedExts = ['exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'dll', 'sys', 'apk', 'dmg', 'pkg', 'iso', 'sh', 'ps1', 'vbs', 'jar', 'js', 'mjs', 'cjs', 'php', 'asp', 'aspx', 'jsp', 'cgi', 'svg'];
+    if (ext && blockedExts.includes(ext)) {
+      setMessage('보안상 직접 실행 파일(.exe, .apk, .dmg 등) 및 스크립트는 업로드할 수 없습니다. 프로그램 공유는 ZIP 압축 파일로 묶어서 업로드해주세요.');
+      setMessageType('danger');
+      setNewFile(null);
+      const fileInput = document.getElementById('dash-file');
+      if (fileInput) fileInput.value = '';
+    }
+  };
+
   // 회원탈퇴 모달
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -302,8 +318,7 @@ export default function DashboardPage() {
                       id="dash-file"
                       type="file"
                       className="form-input"
-                      accept=".pdf,.txt,.html,.htm,.md,.csv,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.png,.jpg,.jpeg,.gif,.webp,.zip,.7z,.tar,.gz,.rar,application/zip,application/x-zip-compressed"
-                      onChange={(e) => setNewFile(e.target.files?.[0] || null)}
+                      onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
                       required
                     />
 
@@ -345,7 +360,7 @@ export default function DashboardPage() {
                     })()}
 
                     <p className="url-form-file-hint" style={{ marginTop: '6px' }}>
-                      최대 5GB까지 지원. 용량에 따라 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
+                      최대 5GB까지 모든 파일(영상, 문서, ZIP 등) 지원. 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다. (실행 파일은 ZIP 압축 권장)
                     </p>
                   </div>
                 )}

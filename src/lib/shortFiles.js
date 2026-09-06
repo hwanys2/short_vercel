@@ -20,43 +20,62 @@ export const SHORT_FILES_BUCKET =
   (typeof process !== 'undefined' && process.env.SHORT_FILES_BUCKET?.trim()) ||
   SHORT_FILES_BUCKET_DEFAULT;
 
-/** MIME types we accept for light document / image sharing / archives */
-export const ALLOWED_FILE_MIMES = new Set([
-  'application/pdf',
-  'text/plain',
-  'text/html',
-  'text/markdown',
-  'text/csv',
-  'application/rtf',
-  'text/rtf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/haansofthwp',
-  'application/x-hwp',
-  'application/haansofthwpx',
-  'application/vnd.hancom.hwp',
-  'application/vnd.hancom.hwpx',
-  'image/png',
-  'image/jpeg',
-  'image/jpg',
-  'image/gif',
-  'image/webp',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/x-7z-compressed',
-  'application/x-tar',
-  'application/gzip',
-  'application/x-gzip',
-  'application/vnd.rar',
-  'application/x-rar-compressed',
-  'application/octet-stream',
+/**
+ * 보안상 직접 업로드가 차단되는 확장자 (실행 파일, 스크립트 등)
+ * 악성코드/스미싱 유포 및 도메인 차단 방지를 위해 직접 실행 파일은 차단하고, ZIP 압축 파일로 공유하도록 유도
+ */
+export const BLOCKED_EXTENSIONS = new Set([
+  // 윈도우 실행/설치 파일
+  'exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'dll', 'sys', 'hta', 'reg', 'cpl',
+  // 모바일/macOS 설치 패키지
+  'apk', 'dmg', 'pkg', 'iso', 'img',
+  // 스크립트 및 런타임
+  'sh', 'bash', 'ps1', 'vbs', 'jar',
+  // 서버/웹 스크립트 및 XSS 위험
+  'js', 'mjs', 'cjs', 'php', 'phtml', 'asp', 'aspx', 'jsp', 'cgi', 'svg',
 ]);
 
-const EXT_MIME_FALLBACK = {
+/**
+ * 주요 확장자별 표준 MIME 타입 매핑 (동영상, 오디오, 문서, 이미지, 압축 등)
+ */
+export const EXT_MIME_FALLBACK = {
+  // 동영상 (Video)
+  mov: 'video/quicktime',
+  mp4: 'video/mp4',
+  m4v: 'video/x-m4v',
+  avi: 'video/x-msvideo',
+  mkv: 'video/x-matroska',
+  webm: 'video/webm',
+  wmv: 'video/x-ms-wmv',
+  flv: 'video/x-flv',
+  '3gp': 'video/3gpp',
+  ts: 'video/mp2t',
+
+  // 오디오 (Audio)
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  flac: 'audio/flac',
+  ogg: 'audio/ogg',
+  wma: 'audio/x-ms-wma',
+  mid: 'audio/midi',
+  midi: 'audio/midi',
+
+  // 이미지 (Images)
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  tiff: 'image/tiff',
+  tif: 'image/tiff',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  ico: 'image/x-icon',
+
+  // 문서 및 텍스트 (Documents & Text)
   pdf: 'application/pdf',
   txt: 'text/plain',
   html: 'text/html',
@@ -73,40 +92,30 @@ const EXT_MIME_FALLBACK = {
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   hwp: 'application/x-hwp',
   hwpx: 'application/haansofthwpx',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
+  epub: 'application/epub+zip',
+
+  // 압축 및 아카이브 (Archives)
   zip: 'application/zip',
   '7z': 'application/x-7z-compressed',
   tar: 'application/x-tar',
   gz: 'application/gzip',
   rar: 'application/vnd.rar',
+  xz: 'application/x-xz',
+  bz2: 'application/x-bzip2',
+
+  // 디자인 / 데이터 (Design & Data)
+  psd: 'image/vnd.adobe.photoshop',
+  ai: 'application/postscript',
+  json: 'application/json',
+  xml: 'application/xml',
+  yaml: 'text/yaml',
+  yml: 'text/yaml',
+  sql: 'text/plain',
+  log: 'text/plain',
 };
 
-const ALLOWED_EXTENSIONS = new Set(Object.keys(EXT_MIME_FALLBACK));
-
-const BLOCKED_EXTENSIONS = new Set([
-  'exe',
-  'bat',
-  'cmd',
-  'com',
-  'msi',
-  'scr',
-  'dll',
-  'sh',
-  'ps1',
-  'jar',
-  'apk',
-  'dmg',
-  'iso',
-  'js',
-  'mjs',
-  'cjs',
-  'svg',
-  'php',
-]);
+export const BLOCKED_FILE_MESSAGE =
+  '보안상 직접 실행 파일(.exe, .apk, .dmg 등) 및 스크립트는 업로드할 수 없습니다. 프로그램 공유는 ZIP 압축 파일로 묶어서 업로드해주세요.';
 
 export function getFileExtension(filename) {
   const base = String(filename || '').normalize('NFC').split(/[/\\]/).pop() || '';
@@ -122,50 +131,47 @@ export function normalizeDisplayFileName(filename) {
 }
 
 /**
- * Resolve MIME: prefer browser type when allowed; else extension fallback.
- * Rejects unknown / blocked types. `application/octet-stream` only for hwp/hwpx and archives.
+ * Resolve MIME: 위험 확장자(직접 실행파일, 웹셸 스크립트 등)만 차단하고,
+ * 그 외의 모든 파일(동영상, 오디오, 문서, 이미지, 디자인 등)은 유연하게 허용합니다.
  */
 export function resolveAllowedMime(file) {
   const name = file?.name || '';
   const ext = getFileExtension(name);
   const declared = (file?.type || '').toLowerCase().trim();
 
-  if (BLOCKED_EXTENSIONS.has(ext)) {
-    return { ok: false, message: '보안상 허용되지 않는 파일 형식입니다.' };
+  if (!ext) {
+    return { ok: false, message: '확장자가 없는 파일은 업로드할 수 없습니다.' };
   }
-  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+
+  if (BLOCKED_EXTENSIONS.has(ext)) {
     return {
       ok: false,
-      message:
-        '허용되지 않는 파일 형식입니다. 문서(PDF, Office, HWP, TXT 등), 이미지, 압축 파일(ZIP 등)만 업로드할 수 있습니다.',
+      message: BLOCKED_FILE_MESSAGE,
     };
   }
 
-  const byExt = EXT_MIME_FALLBACK[ext];
-  const ALLOW_OCTET_EXTS = new Set(['hwp', 'hwpx', 'zip', '7z', 'tar', 'gz', 'rar']);
-
-  if (declared && ALLOWED_FILE_MIMES.has(declared)) {
-    // octet-stream only accepted for Korean office docs or archive files
-    if (declared === 'application/octet-stream' && !ALLOW_OCTET_EXTS.has(ext)) {
-      return { ok: false, message: '허용되지 않는 파일 형식입니다.' };
-    }
-    return { ok: true, mime: declared === 'image/jpg' ? 'image/jpeg' : declared };
+  // 위험 MIME 타입 차단 (확장자를 속여 업로드하려는 시도 방지)
+  if (
+    declared.includes('svg') ||
+    declared.includes('javascript') ||
+    declared.includes('x-sh') ||
+    declared.includes('x-msdownload')
+  ) {
+    return {
+      ok: false,
+      message: BLOCKED_FILE_MESSAGE,
+    };
   }
 
-  if (declared === 'application/octet-stream' && ALLOW_OCTET_EXTS.has(ext)) {
-    return { ok: true, mime: byExt };
+  // 브라우저에서 보낸 MIME이 있고 올바른 형식이면 우선 적용
+  if (declared && declared !== 'application/octet-stream' && declared.includes('/')) {
+    const cleanMime = declared === 'image/jpg' ? 'image/jpeg' : declared;
+    return { ok: true, mime: cleanMime };
   }
 
-  if (!declared || declared === 'application/octet-stream') {
-    return { ok: true, mime: byExt };
-  }
-
-  // Declared MIME not in allow-list
-  return {
-    ok: false,
-    message:
-      '허용되지 않는 파일 형식입니다. 문서(PDF, Office, HWP, TXT 등), 이미지, 압축 파일(ZIP 등)만 업로드할 수 있습니다.',
-  };
+  // 매핑 테이블 조회 또는 기본 octet-stream 부여 (모든 일반 파일 통과)
+  const mime = EXT_MIME_FALLBACK[ext] || 'application/octet-stream';
+  return { ok: true, mime };
 }
 
 export function validateUploadFile(file) {
