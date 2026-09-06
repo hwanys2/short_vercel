@@ -4,7 +4,11 @@ import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
 import { isR2Key } from '@/lib/r2';
-import { R2_STORAGE_THRESHOLD_BYTES, formatFileSize } from '@/lib/shortFilesShared';
+import {
+  R2_STORAGE_THRESHOLD_BYTES,
+  R2_LARGE_FOLDER_THRESHOLD_BYTES,
+  formatFileSize,
+} from '@/lib/shortFilesShared';
 import {
   buildStoragePath,
   deleteShortFile,
@@ -15,18 +19,28 @@ import {
 
 export const runtime = 'nodejs';
 
-function calculateExpirationDate(userId, expireDuration) {
-  if (userId) {
-    return new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
+function calculateFileExpirationDate({ userId, expireDuration, fileSize }) {
+  const size = Number(fileSize) || 0;
+  const isLarge = size > R2_LARGE_FOLDER_THRESHOLD_BYTES; // 1GB 초과
+
+  // 1GB 초과 파일은 자원 관리를 위해 최대 2일간 보관 후 자동 삭제
+  if (isLarge) {
+    const durations = {
+      '24h': 24 * 60 * 60 * 1000,
+      '48h': 48 * 60 * 60 * 1000,
+    };
+    const duration = durations[expireDuration] || 2 * 24 * 60 * 60 * 1000;
+    return new Date(Date.now() + Math.min(duration, 2 * 24 * 60 * 60 * 1000)).toISOString();
   }
+
+  // 1GB 이하 파일은 최대 7일간 보관 후 자동 삭제
   const durations = {
     '24h': 24 * 60 * 60 * 1000,
     '48h': 48 * 60 * 60 * 1000,
     '1week': 7 * 24 * 60 * 60 * 1000,
-    '1month': 30 * 24 * 60 * 60 * 1000,
   };
-  const duration = durations[expireDuration] || durations['1week'];
-  return new Date(Date.now() + duration).toISOString();
+  const duration = durations[expireDuration] || 7 * 24 * 60 * 60 * 1000;
+  return new Date(Date.now() + Math.min(duration, 7 * 24 * 60 * 60 * 1000)).toISOString();
 }
 
 export async function POST(request) {
@@ -81,7 +95,7 @@ export async function POST(request) {
         );
       }
 
-      if (!/^[가-힣a-zA-Z0-9_-]+$/.test(code)) {
+      if (!/^[가-힣a-zA-Z0-9_\-]+$/.test(code)) {
         return NextResponse.json(
           {
             status: 'error',
@@ -123,7 +137,7 @@ export async function POST(request) {
         await deleteShortUrlWithFile(existing);
       }
 
-      const expirationDate = calculateExpirationDate(userId, expireDuration);
+      const expirationDate = calculateFileExpirationDate({ userId, expireDuration, fileSize });
 
       const insertData = {
         original_url: publicUrl || key,
@@ -227,7 +241,7 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(code)) {
+    if (!/^[가-힣a-zA-Z0-9_\-]+$/.test(code)) {
       return NextResponse.json(
         { status: 'error', message: '단축 코드는 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.' },
         { status: 400 }
@@ -265,7 +279,7 @@ export async function POST(request) {
       await deleteShortUrlWithFile(existing);
     }
 
-    const expirationDate = calculateExpirationDate(userId, expireDuration);
+    const expirationDate = calculateFileExpirationDate({ userId, expireDuration, fileSize: validated.fileSize });
 
     const storagePath = buildStoragePath({ userId, fileName: validated.fileName });
     await uploadShortFile({ file, path: storagePath, mime: validated.mime });

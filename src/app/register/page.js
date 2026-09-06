@@ -24,7 +24,7 @@ export default function RegisterPage() {
       setError('비밀번호는 최소 8자 이상이어야 합니다.');
       return;
     }
-    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(form.username)) {
+    if (!/^[가-힣a-zA-Z0-9_\-]+$/.test(form.username)) {
       setError('닉네임은 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.');
       return;
     }

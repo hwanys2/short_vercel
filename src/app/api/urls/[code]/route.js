@@ -111,7 +111,7 @@ export async function PATCH(request, { params }) {
     if (!newCode) {
       return NextResponse.json({ success: false, message: '단축 코드를 입력해주세요.' }, { status: 400 });
     }
-    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(newCode)) {
+    if (!/^[가-힣a-zA-Z0-9_\-]+$/.test(newCode)) {
       return NextResponse.json(
         { success: false, message: '단축 코드는 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.' },
         { status: 400 }

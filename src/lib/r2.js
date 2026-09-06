@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  PutBucketCorsCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { R2_LARGE_FOLDER_THRESHOLD_BYTES } from './shortFilesShared.js';
 
@@ -34,6 +40,9 @@ export function getR2Client() {
       accessKeyId,
       secretAccessKey,
     },
+    // R2 Presigned URL에 비어있는 바디 체크섬(AAAAAA==) 강제 삽입 방지
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 
   return cachedS3Client;
@@ -89,7 +98,7 @@ export function getR2PublicUrl(key) {
  * 안전한 R2 오브젝트 키 생성 (Prefix 분기: 3MB~1GB -> normal/, 1GB~ -> large/)
  */
 export function generateR2Key({ fileName, fileSize }) {
-  const prefix = Number(fileSize) >= R2_LARGE_FOLDER_THRESHOLD_BYTES ? 'large/' : 'normal/';
+  const prefix = Number(fileSize) > R2_LARGE_FOLDER_THRESHOLD_BYTES ? 'large/' : 'normal/';
   const cleanName = String(fileName || 'file')
     .normalize('NFC')
     .split(/[/\\]/)
@@ -109,10 +118,12 @@ export async function createR2PresignedUploadUrl({ fileName, fileSize, mimeType,
   const bucket = getR2BucketName();
   const key = generateR2Key({ fileName, fileSize });
 
+  // Note: ContentType을 PutObjectCommand에 명시하지 않으면 AWS SDK가 X-Amz-SignedHeaders에
+  // content-type을 강제하지 않아 브라우저-서버 간 MIME 사소한 불일치로 인한 403 SignatureDoesNotMatch 오류를 방지합니다.
+  // 브라우저가 PUT 요청 시 전송하는 Content-Type으로 R2에 정상 기록됩니다.
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
-    ContentType: mimeType || 'application/octet-stream',
   });
 
   const presignedUrl = await getSignedUrl(s3, command, { expiresIn });
@@ -123,6 +134,36 @@ export async function createR2PresignedUploadUrl({ fileName, fileSize, mimeType,
     key,
     publicUrl,
   };
+}
+
+/**
+ * R2 버킷에 CORS 정책 자동 적용 시도 (API 토큰에 Admin 권한이 있는 경우 자동 설정)
+ */
+export async function configureR2BucketCors() {
+  try {
+    const s3 = getR2Client();
+    const bucket = getR2BucketName();
+    await s3.send(
+      new PutBucketCorsCommand({
+        Bucket: bucket,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedOrigins: ['*'],
+              AllowedMethods: ['GET', 'PUT', 'HEAD'],
+              AllowedHeaders: ['*'],
+              ExposeHeaders: ['ETag'],
+              MaxAgeSeconds: 3600,
+            },
+          ],
+        },
+      })
+    );
+    return { ok: true };
+  } catch (error) {
+    // API 토큰이 Object Read/Write 전용인 경우 권한 부족 오류(403) 발생 가능 -> 대시보드 수동 설정 안내로 보완
+    return { ok: false, error: error.message };
+  }
 }
 
 /**

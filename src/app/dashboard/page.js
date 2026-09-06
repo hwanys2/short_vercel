@@ -209,8 +209,13 @@ export default function DashboardPage() {
           </div>
 
           {message && (
-            <div className={`alert alert-${messageType}`} style={{ maxWidth: '800px', margin: '0 auto 20px' }}>
-              {message}
+            <div className={`alert alert-${messageType}`} style={{ maxWidth: '800px', margin: '0 auto 20px', lineHeight: '1.5' }}>
+              <div>{message}</div>
+              {message.includes('CORS') && (
+                <div style={{ marginTop: '8px', fontSize: '0.82rem', padding: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px' }}>
+                  💡 <strong>Cloudflare R2 CORS 설정 팁:</strong> Cloudflare R2 버킷(<code>short-kr-files</code>) &gt; Settings &gt; CORS Policy에 AllowedOrigins: <code>[&quot;*&quot;]</code>, AllowedMethods: <code>[&quot;GET&quot;, &quot;PUT&quot;, &quot;HEAD&quot;]</code> 설정을 확인해주세요.
+                </div>
+              )}
             </div>
           )}
 
@@ -294,7 +299,7 @@ export default function DashboardPage() {
                     })()}
 
                     <p className="url-form-file-hint" style={{ marginTop: '6px' }}>
-                      최대 5GB까지 지원. 용량에 따라 보관 수명 주기가 적용되며, 1GB 이상 초대용량 파일은 자원 관리를 위해 빠르게 자동 삭제됩니다.
+                      최대 5GB까지 지원. 용량에 따라 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
                     </p>
                   </div>
                 )}
@@ -302,7 +307,17 @@ export default function DashboardPage() {
                   <label className="form-label" htmlFor="dash-code">단축 코드</label>
                   <div className="dashboard-create-code-row">
                     <span className="dashboard-create-code-prefix">{user.username}/</span>
-                    <input id="dash-code" type="text" className="form-input" placeholder="원하는코드" value={newCode} onChange={(e) => setNewCode(e.target.value)} required />
+                    <input
+                      id="dash-code"
+                      type="text"
+                      className="form-input"
+                      placeholder="원하는코드"
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value)}
+                      required
+                      pattern={"[가-힣a-zA-Z0-9_\\-]+"}
+                      title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
+                    />
                   </div>
                 </div>
 

@@ -136,7 +136,7 @@ export default function UrlForm({ user, onResult }) {
 
   const memberBadgeText =
     mode === 'file'
-      ? '파일은 최근 3개월 미접속 시 자동 삭제됩니다'
+      ? '파일 공유는 1GB 이하 7일, 1GB 초과 2일간 보관 후 자동 삭제됩니다'
       : `회원 ${mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다`;
 
   return (
@@ -267,7 +267,7 @@ export default function UrlForm({ user, onResult }) {
               <p className="url-form-file-hint" style={{ marginTop: '8px', lineHeight: '1.5' }}>
                 📌 <strong>최대 5GB까지 모든 용량의 파일 공유 지원</strong> (문서, 이미지, ZIP 등).
                 <br />
-                용량별 수명 주기에 따라 1GB 이상 초대용량 파일은 자원 관리를 위해 빠르게 자동 삭제됩니다.
+                스토리지 자원 관리를 위해 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
                 {' '}
                 {user ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
               </p>
@@ -287,7 +287,7 @@ export default function UrlForm({ user, onResult }) {
               value={customCode}
               onChange={(e) => setCustomCode(e.target.value)}
               required
-              pattern="[가-힣a-zA-Z0-9_-]+"
+              pattern={"[가-힣a-zA-Z0-9_\\-]+"}
               title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
             />
           </div>
@@ -372,12 +372,24 @@ export default function UrlForm({ user, onResult }) {
           <div className="form-group">
             <label className="form-label">만료 기간</label>
             <div className="duration-options">
-              {[
-                { value: '24h', label: '24시간' },
-                { value: '48h', label: '48시간' },
-                { value: '1week', label: '1주일' },
-                { value: '1month', label: '1개월' },
-              ].map((opt) => (
+              {(mode === 'file'
+                ? (file && file.size > 1024 * 1024 * 1024
+                    ? [
+                        { value: '24h', label: '24시간' },
+                        { value: '48h', label: '48시간 (2일)' },
+                      ]
+                    : [
+                        { value: '24h', label: '24시간' },
+                        { value: '48h', label: '48시간' },
+                        { value: '1week', label: '1주일 (7일)' },
+                      ])
+                : [
+                    { value: '24h', label: '24시간' },
+                    { value: '48h', label: '48시간' },
+                    { value: '1week', label: '1주일' },
+                    { value: '1month', label: '1개월' },
+                  ]
+              ).map((opt) => (
                 <div key={opt.value} className="duration-option">
                   <input
                     type="radio"
@@ -419,7 +431,16 @@ export default function UrlForm({ user, onResult }) {
           </div>
         )}
 
-        {error && <div className="alert alert-danger">⚠️ {error}</div>}
+        {error && (
+          <div className="alert alert-danger" style={{ textAlign: 'left', lineHeight: '1.5' }}>
+            <div>⚠️ {error}</div>
+            {error.includes('CORS') && (
+              <div style={{ marginTop: '8px', fontSize: '0.82rem', padding: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px' }}>
+                💡 <strong>Cloudflare R2 CORS 설정 팁:</strong> Cloudflare R2 버킷(<code>short-kr-files</code>) &gt; Settings &gt; CORS Policy에 AllowedOrigins: <code>[&quot;*&quot;]</code>, AllowedMethods: <code>[&quot;GET&quot;, &quot;PUT&quot;, &quot;HEAD&quot;]</code> 설정을 확인해주세요.
+              </div>
+            )}
+          </div>
+        )}
 
         <button type="submit" className="btn btn-primary btn-shorten" disabled={loading}>
           {loading ? (
@@ -436,7 +457,7 @@ export default function UrlForm({ user, onResult }) {
           <p className="url-form-guest-note">
             좋은 단축 코드를 나눠 사용하기 위해 만료 기간이 설정됩니다. 영구 단축을 원하시면{' '}
             <Link href="/register">회원가입</Link>을 하세요. 숏.한국/닉네임/단축코드로 영구적인 단축주소를 가질 수
-            있습니다. (파일 공유는 회원도 3개월 미접속 시 자동 삭제됩니다.)
+            있습니다. (파일 공유는 1GB 이하 7일, 1GB 초과 2일간 보관 후 자동 삭제됩니다.)
           </p>
         )}
       </form>

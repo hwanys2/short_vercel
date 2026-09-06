@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest } from '@/lib/auth';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
-import { createR2PresignedUploadUrl, isR2Configured } from '@/lib/r2';
+import { createR2PresignedUploadUrl, isR2Configured, configureR2BucketCors } from '@/lib/r2';
 import {
   formatFileSize,
   MAX_FILE_BYTES,
@@ -82,7 +82,7 @@ export async function POST(request) {
       );
     }
 
-    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(code)) {
+    if (!/^[가-힣a-zA-Z0-9_\-]+$/.test(code)) {
       return NextResponse.json(
         {
           status: 'error',
@@ -91,6 +91,9 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    // R2 버킷 CORS 정책 자동 설정 시도 (권한 있을 시 비동기 백그라운드 적용)
+    configureR2BucketCors().catch(() => {});
 
     // 사전 단축 코드 중복 검사 (대용량 업로드 전 확인)
     const user = getUserFromRequest(request);

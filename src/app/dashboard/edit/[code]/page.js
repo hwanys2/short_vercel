@@ -299,7 +299,7 @@ export default function EditUrlPage() {
                         value={customCode}
                         onChange={(e) => setCustomCode(e.target.value)}
                         required
-                        pattern="[가-힣a-zA-Z0-9_-]+"
+                        pattern={"[가-힣a-zA-Z0-9_\\-]+"}
                         title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
                       />
                     </div>

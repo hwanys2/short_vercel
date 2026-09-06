@@ -29,7 +29,7 @@ export async function POST(request) {
       );
     }
 
-    if (!/^[가-힣a-zA-Z0-9_-]+$/.test(username)) {
+    if (!/^[가-힣a-zA-Z0-9_\-]+$/.test(username)) {
       return NextResponse.json(
         { success: false, message: '닉네임은 한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다.' },
         { status: 400 }

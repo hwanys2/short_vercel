@@ -3,11 +3,12 @@ import { R2_STORAGE_THRESHOLD_BYTES, formatFileSize } from './shortFilesShared.j
 /**
  * XHR 기반 R2 직접 PUT 업로드 및 실시간 진행률 콜백
  */
-export function uploadToR2WithProgress(presignedUrl, file, onProgress) {
+export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', presignedUrl, true);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    const ct = mimeType || file.type || 'application/octet-stream';
+    xhr.setRequestHeader('Content-Type', ct);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
@@ -29,7 +30,7 @@ export function uploadToR2WithProgress(presignedUrl, file, onProgress) {
     };
 
     xhr.onerror = () => {
-      reject(new Error('네트워크 오류로 R2 업로드에 실패했습니다. Cloudflare R2 버킷의 CORS 설정(PUT 메서드 허용)을 확인해주세요.'));
+      reject(new Error('네트워크 또는 CORS 오류로 Cloudflare R2 업로드에 실패했습니다. Cloudflare R2 버킷의 CORS 설정(PUT 메서드 및 도메인 허용)을 확인해주세요.'));
     };
 
     xhr.ontimeout = () => {
@@ -90,15 +91,20 @@ export async function uploadShortFileAuto({
       });
     }
 
-    await uploadToR2WithProgress(presignedUrl, file, ({ percent, loaded, total }) => {
-      if (onProgress) {
-        onProgress({
-          percent,
-          statusText: 'R2로 초고속 직접 업로드 중...',
-          detailText: `${percent}% (${formatFileSize(loaded)} / ${formatFileSize(total)})`,
-        });
-      }
-    });
+    await uploadToR2WithProgress(
+      presignedUrl,
+      file,
+      ({ percent, loaded, total }) => {
+        if (onProgress) {
+          onProgress({
+            percent,
+            statusText: 'R2로 초고속 직접 업로드 중...',
+            detailText: `${percent}% (${formatFileSize(loaded)} / ${formatFileSize(total)})`,
+          });
+        }
+      },
+      fileMime
+    );
 
     // 3. 완료 및 DB 등록
     if (onProgress) {

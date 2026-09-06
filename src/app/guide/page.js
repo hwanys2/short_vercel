@@ -36,9 +36,8 @@ export default function GuidePage() {
             <li>허용: PDF, Office, HWP, TXT/HTML/MD/CSV, 이미지(PNG/JPG/GIF/WEBP), 압축파일(ZIP/7Z/TAR/GZ/RAR) 등</li>
             <li><strong>용량별 수명 주기(자동 삭제) 규칙:</strong>
               <ul style={{ marginTop: '6px' }}>
-                <li><strong>3MB 미만 (일반 파일):</strong> 비회원은 설정한 만료 기간 후, 회원은 최근 3개월 미접속 시 자동 삭제됩니다.</li>
-                <li><strong>3MB 이상 ~ 1GB 미만 (대용량):</strong> Cloudflare R2에 안전하게 보관되며, 수명 주기 정책에 따라 일정 기간 후 자동 삭제됩니다.</li>
-                <li><strong>1GB 이상 ~ 5GB (초대용량):</strong> 대용량 자원 관리를 위해 단기 보관(1~3일) 후 빠르게 자동 삭제됩니다.</li>
+                <li><strong>1GB 이하 (일반 및 대용량):</strong> 7일간 보관 후 자동 삭제됩니다. (3MB 미만은 Supabase Storage, 3MB 이상은 Cloudflare R2 보관)</li>
+                <li><strong>1GB 초과 ~ 5GB (초대용량):</strong> Cloudflare R2에 업로드되며 대용량 자원 관리를 위해 2일간 보관 후 자동 삭제됩니다.</li>
               </ul>
             </li>
             <li>개인정보 보호와 스토리지 관리를 위해 링크 소멸 시 파일도 함께 완전히 제거됩니다.</li>
