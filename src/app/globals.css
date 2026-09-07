@@ -1072,6 +1072,308 @@ a:hover {
   }
 }
 
+/* ============ File Viewer Page & Countdown Components ============ */
+.file-view-file-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.file-view-type-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-view-file-details {
+  min-width: 0;
+  flex: 1;
+}
+
+.file-view-filename {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.file-view-filesize-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary-light);
+  background: rgba(94, 105, 235, 0.1);
+  border-radius: var(--radius-full);
+}
+
+/* Expiration Card */
+.file-view-expiry-card {
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.file-view-expiry-card.is-normal {
+  border-color: rgba(94, 105, 235, 0.32);
+  background: linear-gradient(145deg, rgba(94, 105, 235, 0.06), rgba(167, 139, 250, 0.03));
+}
+
+.file-view-expiry-card.is-warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.04));
+}
+
+.file-view-expiry-card.is-critical {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.04));
+}
+
+.file-view-expiry-card.is-expired {
+  border-color: rgba(118, 126, 164, 0.35);
+  background: rgba(118, 126, 164, 0.07);
+}
+
+.file-view-expiry-card.is-indefinite {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
+}
+
+.file-view-expiry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.file-view-expiry-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.file-view-expiry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--radius-full);
+}
+
+.file-view-expiry-badge.badge-normal {
+  color: var(--primary);
+  background: rgba(94, 105, 235, 0.14);
+}
+
+.file-view-expiry-badge.badge-warning {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.file-view-expiry-badge.badge-critical {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.18);
+  animation: pulse 1.6s infinite;
+}
+
+.file-view-expiry-badge.badge-expired {
+  color: var(--text-muted);
+  background: rgba(118, 126, 164, 0.16);
+}
+
+.file-view-expiry-badge.badge-indefinite {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.file-view-countdown-container {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 0 10px;
+  flex-wrap: wrap;
+}
+
+.file-view-countdown-value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.file-view-countdown-value.time-normal {
+  color: var(--primary);
+}
+
+.file-view-countdown-value.time-warning {
+  color: #d97706;
+}
+
+.file-view-countdown-value.time-critical {
+  color: #dc2626;
+}
+
+.file-view-countdown-value.time-expired {
+  color: var(--text-muted);
+  font-size: 1.4rem;
+}
+
+.file-view-countdown-value.time-indefinite {
+  color: var(--success);
+  font-size: 1.4rem;
+}
+
+.file-view-countdown-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Progress bar */
+.file-view-progress-wrap {
+  width: 100%;
+  height: 6px;
+  background: rgba(73, 85, 126, 0.14);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin: 10px 0 14px;
+}
+
+.file-view-progress-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s ease;
+}
+
+.file-view-progress-bar.bar-normal {
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+}
+
+.file-view-progress-bar.bar-warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.file-view-progress-bar.bar-critical {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.file-view-expiry-notice {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-top: 6px;
+}
+
+.file-view-expiry-sub {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Header chip */
+.file-view-header-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+}
+
+.file-view-header-chip.is-normal {
+  color: var(--primary);
+  background: rgba(94, 105, 235, 0.1);
+}
+
+.file-view-header-chip.is-warning {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.file-view-header-chip.is-critical {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.file-view-header-chip.is-expired {
+  color: var(--text-muted);
+  background: rgba(118, 126, 164, 0.12);
+}
+
+.file-view-header-chip.is-indefinite {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.btn.btn-disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+  color: #ffffff;
+}
+
+[data-theme='dark'] .file-view-expiry-badge.badge-warning,
+[data-theme='dark'] .file-view-countdown-value.time-warning,
+[data-theme='dark'] .file-view-header-chip.is-warning {
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .file-view-expiry-badge.badge-critical,
+[data-theme='dark'] .file-view-countdown-value.time-critical,
+[data-theme='dark'] .file-view-header-chip.is-critical {
+  color: #f87171;
+}
+
+@media (max-width: 600px) {
+  .file-view-file-info {
+    gap: 12px;
+  }
+
+  .file-view-type-icon {
+    font-size: 1.8rem;
+    padding: 8px;
+  }
+
+  .file-view-filename {
+    font-size: 1.05rem;
+  }
+
+  .file-view-countdown-value {
+    font-size: 1.45rem;
+  }
+
+  .file-view-expiry-card {
+    padding: 18px 16px;
+  }
+}
+
 .btn-shorten {
   width: 100%;
   padding: 16px;

@@ -36,7 +36,7 @@ export async function GET(request) {
       const { data } = await supabase
         .from('short_urls')
         .select(
-          'id, original_url, type, code, file_name, file_path, link_password_hash, link_password_unlock_version'
+          'id, original_url, type, code, file_name, file_path, link_password_hash, link_password_unlock_version, expiration_date'
         )
         .eq('code', normalizedCode)
         .eq('user_id', user.id)
@@ -48,11 +48,10 @@ export async function GET(request) {
       const { data } = await supabase
         .from('short_urls')
         .select(
-          'id, original_url, type, code, file_name, file_path, link_password_hash, link_password_unlock_version'
+          'id, original_url, type, code, file_name, file_path, link_password_hash, link_password_unlock_version, expiration_date'
         )
         .eq('code', normalizedCode)
         .is('user_id', null)
-        .gt('expiration_date', new Date().toISOString())
         .single();
 
       urlData = data;
@@ -61,6 +60,10 @@ export async function GET(request) {
 
     if (!urlData || urlData.type !== 'file' || !urlData.file_path) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (urlData.expiration_date && new Date(urlData.expiration_date) <= new Date()) {
+      return NextResponse.json({ error: 'Download expired' }, { status: 410 });
     }
 
     const protectedLink =

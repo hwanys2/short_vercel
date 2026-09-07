@@ -34,7 +34,7 @@ async function loadFileRow(request) {
     const { data } = await supabase
       .from('short_urls')
       .select(
-        'id, type, code, file_name, file_size, file_mime, file_path, link_password_hash, link_password_unlock_version'
+        'id, type, code, file_name, file_size, file_mime, file_path, link_password_hash, link_password_unlock_version, expiration_date, created_at'
       )
       .eq('code', normalizedCode)
       .eq('user_id', user.id)
@@ -46,11 +46,10 @@ async function loadFileRow(request) {
     const { data } = await supabase
       .from('short_urls')
       .select(
-        'id, type, code, file_name, file_size, file_mime, file_path, link_password_hash, link_password_unlock_version'
+        'id, type, code, file_name, file_size, file_mime, file_path, link_password_hash, link_password_unlock_version, expiration_date, created_at'
       )
       .eq('code', normalizedCode)
       .is('user_id', null)
-      .gt('expiration_date', new Date().toISOString())
       .single();
 
     urlData = data;
@@ -59,6 +58,23 @@ async function loadFileRow(request) {
 
   if (!urlData || urlData.type !== 'file' || !urlData.file_path) {
     return { error: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
+  }
+
+  const isExpired =
+    urlData.expiration_date && new Date(urlData.expiration_date) <= new Date();
+
+  if (isExpired) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'File expired',
+          expired: true,
+          file_name: urlData.file_name,
+          expiration_date: urlData.expiration_date,
+        },
+        { status: 410 }
+      ),
+    };
   }
 
   const protectedLink =
@@ -87,6 +103,9 @@ export async function GET(request) {
       file_size: urlData.file_size,
       file_size_label: formatFileSize(urlData.file_size),
       file_mime: urlData.file_mime,
+      expiration_date: urlData.expiration_date,
+      created_at: urlData.created_at,
+      server_time: new Date().toISOString(),
     });
   } catch (error) {
     console.error('File meta fetch error:', error);
