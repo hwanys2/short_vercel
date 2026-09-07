@@ -172,8 +172,10 @@ export default function UrlForm({ user, onResult }) {
 
     if (selectedFile.size > 1024 * 1024 * 1024) {
       setExpireDuration('48h');
-    } else if (selectedFile.size >= 3 * 1024 * 1024) {
+    } else if (selectedFile.size > 10 * 1024 * 1024) {
       setExpireDuration('1week');
+    } else {
+      setExpireDuration('1month');
     }
   };
 
@@ -184,22 +186,25 @@ export default function UrlForm({ user, onResult }) {
     if (newMode === 'file' && file) {
       if (file.size > 1024 * 1024 * 1024) {
         setExpireDuration('48h');
-      } else if (file.size >= 3 * 1024 * 1024) {
+      } else if (file.size > 10 * 1024 * 1024) {
         setExpireDuration('1week');
+      } else {
+        setExpireDuration('1month');
       }
     }
   };
 
   const isFileMode = mode === 'file';
   const isLargeR2 = isFileMode && Boolean(file && file.size > 1024 * 1024 * 1024);
-  const isNormalR2 = isFileMode && Boolean(file && file.size >= 3 * 1024 * 1024 && file.size <= 1024 * 1024 * 1024);
-  const isR2File = isLargeR2 || isNormalR2;
+  const isNormalR2 = isFileMode && Boolean(file && file.size > 10 * 1024 * 1024 && file.size <= 1024 * 1024 * 1024);
+  const isSmallFile = isFileMode && Boolean(file && file.size <= 10 * 1024 * 1024);
+  const isR2File = isLargeR2 || isNormalR2 || isSmallFile;
 
   let durationOptions = [
     { value: '24h', label: '24시간' },
     { value: '48h', label: '48시간' },
     { value: '1week', label: '1주일' },
-    { value: '1month', label: '1개월' },
+    { value: '1month', label: '1개월 (30일)' },
   ];
 
   if (isLargeR2) {
@@ -208,7 +213,7 @@ export default function UrlForm({ user, onResult }) {
       { value: '48h', label: '🔒 2일 (48시간 후 종료 - 저장 기간 일치)' },
     ];
   } else if (isNormalR2) {
-    // 3MB 초과 ~ 1GB 이하 파일: 딱 7일(1주일)만 가능
+    // 10MB 초과 ~ 1GB 이하 파일: 딱 7일(1주일)만 가능
     durationOptions = [
       { value: '1week', label: '🔒 7일 (1주일 후 종료 - 저장 기간 일치)' },
     ];
@@ -216,7 +221,7 @@ export default function UrlForm({ user, onResult }) {
 
   const memberBadgeText =
     mode === 'file'
-      ? '파일 공유는 1GB 이하 7일, 1GB 초과 2일간 보관 후 자동 삭제됩니다'
+      ? '파일 공유는 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과 2일간 보관 후 자동 삭제됩니다 (주소는 영구 유지)'
       : `회원 ${mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다`;
 
   return (
@@ -346,7 +351,7 @@ export default function UrlForm({ user, onResult }) {
               <p className="url-form-file-hint" style={{ marginTop: '8px', lineHeight: '1.5' }}>
                 📌 <strong>최대 5GB까지 모든 파일 공유 지원</strong> (동영상, 문서, 이미지, ZIP 등. 실행 파일은 ZIP 압축 권장).
                 <br />
-                스토리지 자원 관리를 위해 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
+                스토리지 자원 관리를 위해 10MB 이하는 30일, 10MB~1GB는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
                 {' '}
                 {user ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
               </p>
@@ -488,7 +493,12 @@ export default function UrlForm({ user, onResult }) {
             )}
             {isNormalR2 && (
               <p style={{ fontSize: '0.8rem', color: '#10b981', marginTop: '6px', lineHeight: '1.4' }}>
-                ⚡ 3MB 초과 ~ 1GB 이하 대용량 파일은 스토리지 보관 기간에 맞춰 링크도 <strong>7일(1주일) 후 자동 종료</strong>됩니다.
+                ⚡ 10MB 초과 ~ 1GB 대용량 파일은 스토리지 보관 기간에 맞춰 링크도 <strong>7일(1주일) 후 자동 종료</strong>됩니다.
+              </p>
+            )}
+            {isSmallFile && (
+              <p style={{ fontSize: '0.8rem', color: '#2563eb', marginTop: '6px', lineHeight: '1.4' }}>
+                📄 10MB 이하 일반 파일은 기본 <strong>30일간 보관</strong>되며 원하시는 만료 기간을 선택할 수 있습니다.
               </p>
             )}
           </div>

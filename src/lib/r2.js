@@ -6,7 +6,10 @@ import {
   PutBucketCorsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { R2_LARGE_FOLDER_THRESHOLD_BYTES } from './shortFilesShared.js';
+import {
+  R2_SMALL_FOLDER_THRESHOLD_BYTES,
+  R2_LARGE_FOLDER_THRESHOLD_BYTES,
+} from './shortFilesShared.js';
 
 let cachedS3Client = null;
 
@@ -54,6 +57,7 @@ export function getR2Client() {
 export function isR2Key(keyOrPath) {
   if (!keyOrPath || typeof keyOrPath !== 'string') return false;
   return (
+    keyOrPath.startsWith('small/') ||
     keyOrPath.startsWith('normal/') ||
     keyOrPath.startsWith('large/') ||
     keyOrPath.includes('.r2.dev/') ||
@@ -66,13 +70,21 @@ export function isR2Key(keyOrPath) {
  */
 export function extractR2Key(keyOrUrl) {
   if (!keyOrUrl || typeof keyOrUrl !== 'string') return '';
-  if (keyOrUrl.startsWith('normal/') || keyOrUrl.startsWith('large/')) {
+  if (
+    keyOrUrl.startsWith('small/') ||
+    keyOrUrl.startsWith('normal/') ||
+    keyOrUrl.startsWith('large/')
+  ) {
     return keyOrUrl;
   }
   try {
     const url = new URL(keyOrUrl);
     const pathname = url.pathname.replace(/^\/+/, '');
-    if (pathname.startsWith('normal/') || pathname.startsWith('large/')) {
+    if (
+      pathname.startsWith('small/') ||
+      pathname.startsWith('normal/') ||
+      pathname.startsWith('large/')
+    ) {
       return pathname;
     }
   } catch {}
@@ -95,10 +107,17 @@ export function getR2PublicUrl(key) {
 }
 
 /**
- * 안전한 R2 오브젝트 키 생성 (Prefix 분기: 3MB~1GB -> normal/, 1GB~ -> large/)
+ * 안전한 R2 오브젝트 키 생성 (Prefix 분기: <=10MB -> small/, 10MB~1GB -> normal/, 1GB~ -> large/)
  */
 export function generateR2Key({ fileName, fileSize }) {
-  const prefix = Number(fileSize) > R2_LARGE_FOLDER_THRESHOLD_BYTES ? 'large/' : 'normal/';
+  const n = Number(fileSize) || 0;
+  let prefix = 'small/';
+  if (n > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
+    prefix = 'large/';
+  } else if (n > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
+    prefix = 'normal/';
+  }
+
   const cleanName = String(fileName || 'file')
     .normalize('NFC')
     .split(/[/\\]/)

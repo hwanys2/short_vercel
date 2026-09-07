@@ -81,127 +81,128 @@ export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType,
 }
 
 /**
- * 용량에 따라 Supabase(<3MB) 또는 Cloudflare R2(>=3MB)로 자동 분기 업로드
+ * 파일 객체를 Cloudflare R2에 직접 업로드하고 스토리지 키 및 메타데이터 반환 (생성 및 수정 공용)
+ */
+export async function uploadFileToR2Only({
+  file,
+  customCode = '',
+  onProgress,
+  signal,
+  isEdit = false,
+}) {
+  // 1. Presigned URL 발급
+  if (onProgress) {
+    onProgress({
+      percent: 0,
+      statusText: '업로드 준비 중...',
+      detailText: 'Cloudflare R2 서명 URL 발급 중',
+    });
+  }
+
+  const presignRes = await fetch('/api/upload/r2-presign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type || 'application/octet-stream',
+      customCode: customCode.trim(),
+      isEdit: Boolean(isEdit),
+    }),
+    signal,
+  });
+
+  const presignData = await presignRes.json();
+  if (presignData.status !== 'success') {
+    throw new Error(presignData.message || 'Presigned URL 발급에 실패했습니다.');
+  }
+
+  const { presignedUrl, key, publicUrl, fileMime } = presignData.data;
+
+  // 2. R2로 직접 PUT 업로드 (브라우저 -> Cloudflare R2)
+  if (onProgress) {
+    onProgress({
+      percent: 0,
+      statusText: 'R2로 초고속 직접 업로드 중...',
+      detailText: `0% (0 B / ${formatFileSize(file.size)})`,
+    });
+  }
+
+  await uploadToR2WithProgress(
+    presignedUrl,
+    file,
+    ({ percent, loaded, total }) => {
+      if (onProgress) {
+        onProgress({
+          percent,
+          statusText: 'R2로 초고속 직접 업로드 중...',
+          detailText: `${percent}% (${formatFileSize(loaded)} / ${formatFileSize(total)})`,
+        });
+      }
+    },
+    fileMime,
+    signal
+  );
+
+  return {
+    key,
+    publicUrl,
+    fileName: file.name,
+    fileSize: file.size,
+    fileMime,
+  };
+}
+
+/**
+ * 모든 파일을 Cloudflare R2로 초고속 직접 업로드 후 단축 주소 등록
  */
 export async function uploadShortFileAuto({
   file,
   customCode,
-  expireDuration = '1week',
+  expireDuration = '1month',
   linkPasswordEnabled = false,
   linkPassword = '',
   onProgress,
   signal,
 }) {
-  const isR2Upload = file.size >= R2_STORAGE_THRESHOLD_BYTES;
+  const uploaded = await uploadFileToR2Only({
+    file,
+    customCode,
+    onProgress,
+    signal,
+    isEdit: false,
+  });
 
-  if (isR2Upload) {
-    // 1. Presigned URL 발급
-    if (onProgress) {
-      onProgress({
-        percent: 0,
-        statusText: '업로드 준비 중...',
-        detailText: 'Cloudflare R2 서명 URL 발급 중',
-      });
-    }
-
-    const presignRes = await fetch('/api/upload/r2-presign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type || 'application/octet-stream',
-        customCode: customCode.trim(),
-      }),
-      signal,
+  // 3. 완료 및 DB 등록
+  if (onProgress) {
+    onProgress({
+      percent: 100,
+      statusText: '단축 주소 생성 중...',
+      detailText: '데이터베이스에 링크 등록 중',
     });
-
-    const presignData = await presignRes.json();
-    if (presignData.status !== 'success') {
-      throw new Error(presignData.message || 'Presigned URL 발급에 실패했습니다.');
-    }
-
-    const { presignedUrl, key, publicUrl, fileMime } = presignData.data;
-
-    // 2. R2로 직접 PUT 업로드 (브라우저 -> Cloudflare R2)
-    if (onProgress) {
-      onProgress({
-        percent: 0,
-        statusText: 'R2로 초고속 직접 업로드 중...',
-        detailText: `0% (0 B / ${formatFileSize(file.size)})`,
-      });
-    }
-
-    await uploadToR2WithProgress(
-      presignedUrl,
-      file,
-      ({ percent, loaded, total }) => {
-        if (onProgress) {
-          onProgress({
-            percent,
-            statusText: 'R2로 초고속 직접 업로드 중...',
-            detailText: `${percent}% (${formatFileSize(loaded)} / ${formatFileSize(total)})`,
-          });
-        }
-      },
-      fileMime,
-      signal
-    );
-
-    // 3. 완료 및 DB 등록
-    if (onProgress) {
-      onProgress({
-        percent: 100,
-        statusText: '단축 주소 생성 중...',
-        detailText: '데이터베이스에 링크 등록 중',
-      });
-    }
-
-    const completeRes = await fetch('/api/shorten-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        key,
-        publicUrl,
-        fileName: file.name,
-        fileSize: file.size,
-        fileMime,
-        customCode: customCode.trim(),
-        expireDuration,
-        linkPasswordEnabled,
-        linkPassword: linkPasswordEnabled ? linkPassword.trim() : '',
-      }),
-      signal,
-    });
-
-    const completeData = await completeRes.json();
-    if (completeData.status !== 'success') {
-      throw new Error(completeData.message || '단축 주소 등록에 실패했습니다.');
-    }
-
-    return completeData;
   }
 
-  // 3MB 미만: 기존 Supabase Storage FormData 업로드
-  const form = new FormData();
-  form.append('file', file);
-  form.append('custom_code', customCode.trim());
-  form.append('expire_duration', expireDuration);
-  form.append('link_password_enabled', linkPasswordEnabled ? 'true' : 'false');
-  if (linkPasswordEnabled) {
-    form.append('link_password', linkPassword.trim());
-  }
-
-  const res = await fetch('/api/shorten-file', {
+  const completeRes = await fetch('/api/shorten-file', {
     method: 'POST',
-    body: form,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      key: uploaded.key,
+      publicUrl: uploaded.publicUrl,
+      fileName: uploaded.fileName,
+      fileSize: uploaded.fileSize,
+      fileMime: uploaded.fileMime,
+      customCode: customCode.trim(),
+      expireDuration,
+      linkPasswordEnabled,
+      linkPassword: linkPasswordEnabled ? linkPassword.trim() : '',
+    }),
     signal,
   });
 
-  const data = await res.json();
-  if (data.status !== 'success') {
-    throw new Error(data.message || '단축 주소 생성에 실패했습니다.');
+  const completeData = await completeRes.json();
+  if (completeData.status !== 'success') {
+    throw new Error(completeData.message || '단축 주소 등록에 실패했습니다.');
   }
 
-  return data;
+  return completeData;
 }

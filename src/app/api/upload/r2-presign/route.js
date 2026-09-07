@@ -36,22 +36,12 @@ export async function POST(request) {
       );
     }
 
-    const { fileName, fileSize, fileType, customCode } = body;
+    const { fileName, fileSize, fileType, customCode, isEdit } = body;
 
     const size = Number(fileSize);
     if (!fileSize || isNaN(size) || size <= 0) {
       return NextResponse.json(
         { status: 'error', message: '유효한 파일 크기가 아닙니다.' },
-        { status: 400 }
-      );
-    }
-
-    if (size < R2_STORAGE_THRESHOLD_BYTES) {
-      return NextResponse.json(
-        {
-          status: 'error',
-          message: `${formatFileSize(R2_STORAGE_THRESHOLD_BYTES)} 미만의 파일은 일반 업로드를 사용해야 합니다.`,
-        },
         { status: 400 }
       );
     }
@@ -96,38 +86,40 @@ export async function POST(request) {
     // R2 버킷 CORS 정책 자동 설정 시도 (권한 있을 시 비동기 백그라운드 적용)
     configureR2BucketCors().catch(() => {});
 
-    // 사전 단축 코드 중복 검사 (대용량 업로드 전 확인)
-    const user = getUserFromRequest(request);
-    const userId = user?.id || null;
-    const supabase = getSupabaseAdmin();
+    // 사전 단축 코드 중복 검사 (신규 생성 시에만 검사, 수정(isEdit) 시에는 제외)
+    if (!isEdit) {
+      const user = getUserFromRequest(request);
+      const userId = user?.id || null;
+      const supabase = getSupabaseAdmin();
 
-    let query = supabase
-      .from('short_urls')
-      .select('id, expiration_date, user_id')
-      .eq('code', code);
+      let query = supabase
+        .from('short_urls')
+        .select('id, expiration_date, user_id')
+        .eq('code', code);
 
-    if (userId) {
-      query = query.eq('user_id', userId);
-    } else {
-      query = query.is('user_id', null);
-    }
+      if (userId) {
+        query = query.eq('user_id', userId);
+      } else {
+        query = query.is('user_id', null);
+      }
 
-    const { data: existing } = await query.maybeSingle();
+      const { data: existing } = await query.maybeSingle();
 
-    if (existing) {
-      const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
-      if (!isExpired) {
-        const message = userId
-          ? memberDuplicateCodeMessage()
-          : guestDuplicateCodeMessage(existing.expiration_date);
-        return NextResponse.json(
-          {
-            status: 'error',
-            message,
-            expiration_date: existing.expiration_date ?? null,
-          },
-          { status: 409 }
-        );
+      if (existing) {
+        const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
+        if (!isExpired) {
+          const message = userId
+            ? memberDuplicateCodeMessage()
+            : guestDuplicateCodeMessage(existing.expiration_date);
+          return NextResponse.json(
+            {
+              status: 'error',
+              message,
+              expiration_date: existing.expiration_date ?? null,
+            },
+            { status: 409 }
+          );
+        }
       }
     }
 

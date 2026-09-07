@@ -226,8 +226,13 @@ export default function FileViewContent() {
                     <p>
                       다운로드 가능 기간
                       {expiredInfo.expirationDate ? `(${formatKoreanDeadline(expiredInfo.expirationDate)})` : ''}
-                      이 종료되어 파일이 삭제되었습니다.
+                      이 종료되어 파일 다운로드가 마감되었습니다.
                     </p>
+                    {username && (
+                      <p style={{ marginTop: '8px', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                        💡 게시자가 대시보드 [수정]에서 새 파일을 등록하면 다운로드 기간이 다시 연장됩니다.
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p>요청하신 단축 주소가 없거나 만료·삭제되었습니다.</p>

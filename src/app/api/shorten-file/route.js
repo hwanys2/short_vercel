@@ -6,6 +6,7 @@ import { buildShortUrl } from '@/lib/siteUrl';
 import { isR2Key } from '@/lib/r2';
 import {
   R2_STORAGE_THRESHOLD_BYTES,
+  R2_SMALL_FOLDER_THRESHOLD_BYTES,
   R2_LARGE_FOLDER_THRESHOLD_BYTES,
   formatFileSize,
 } from '@/lib/shortFilesShared';
@@ -22,30 +23,30 @@ export const runtime = 'nodejs';
 function calculateFileExpirationDate({ userId, expireDuration, fileSize }) {
   const size = Number(fileSize) || 0;
 
-  // 1. 1GB 초과 초대용량 파일: 스토리지 보관 기간(2일)과 일치시켜 무조건 2일(48시간) 후 링크 만료
+  // 1. 1GB 초과 ~ 5GB 초대용량 파일: 2일(48시간) 후 만료
   if (size > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
     return new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  // 2. 3MB 초과 ~ 1GB 이하 대용량 파일: 스토리지 보관 기간(7일)과 일치시켜 무조건 7일(1주일) 후 링크 만료
-  if (size >= R2_STORAGE_THRESHOLD_BYTES) {
+  // 2. 10MB 초과 ~ 1GB 대용량 파일: 7일(1주일) 후 만료
+  if (size > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
     return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  // 3. 3MB 미만 일반 파일 (Supabase Storage)
+  // 3. 0 ~ 10MB 일반 파일
   if (userId) {
-    // 회원은 영구 유지 (최근 3개월 미접속 시 정리)
-    return new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
+    // 회원은 30일 보관 (만료 시 단축 주소는 영구 유지되며, 대시보드 수정에서 새 파일 재등록 시 연장)
+    return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  // 비회원은 선택한 만료 기간 적용 (기본 1주일)
+  // 비회원은 선택한 만료 기간 적용 (기본 1개월/30일)
   const durations = {
     '24h': 24 * 60 * 60 * 1000,
     '48h': 48 * 60 * 60 * 1000,
     '1week': 7 * 24 * 60 * 60 * 1000,
     '1month': 30 * 24 * 60 * 60 * 1000,
   };
-  const duration = durations[expireDuration] || 7 * 24 * 60 * 60 * 1000;
+  const duration = durations[expireDuration] || 30 * 24 * 60 * 60 * 1000;
   return new Date(Date.now() + duration).toISOString();
 }
 
@@ -208,7 +209,7 @@ export async function POST(request) {
     }
 
     // ========================================================
-    // 2. 3MB 미만 Supabase Storage 업로드 (FormData 요청)
+    // 2. 레거시 FormData 업로드 (하위 호환 지원)
     // ========================================================
     const form = await request.formData();
     const file = form.get('file');

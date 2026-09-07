@@ -129,7 +129,7 @@ export default function DashboardPage() {
         const fileExpireDuration =
           newFile.size > 1024 * 1024 * 1024
             ? '48h'
-            : (newFile.size >= 3 * 1024 * 1024 ? '1week' : '100years');
+            : (newFile.size > 10 * 1024 * 1024 ? '1week' : '1month');
 
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
@@ -256,7 +256,7 @@ export default function DashboardPage() {
           <div className="dashboard-header">
             <h1>{user.username}님의 대시보드</h1>
             <div className="user-badge">
-              ✨ URL·텍스트는 영구 · 파일은 3개월 미접속 시 삭제 · {baseUrl}{user.username}/코드
+              ✨ URL·텍스트는 영구 · 파일은 10MB 이하 30일/대용량 7일(만료 시 수정에서 재등록 가능) · {baseUrl}{user.username}/코드
             </div>
           </div>
 
@@ -347,12 +347,17 @@ export default function DashboardPage() {
                           </div>
                           {newFile.size > 1024 * 1024 * 1024 && (
                             <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(239, 68, 68, 0.3)', color: '#ef4444', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 링크 만료 기간: <strong>2일 (48시간 후 종료)</strong> — 파일 저장 기간과 동일 적용
+                              🔒 다운로드 가능 기간: <strong>2일 (48시간 후 만료)</strong> — 주소는 유지되며 만료 시 수정에서 재등록 가능
                             </div>
                           )}
-                          {newFile.size >= 3 * 1024 * 1024 && newFile.size <= 1024 * 1024 * 1024 && (
+                          {newFile.size > 10 * 1024 * 1024 && newFile.size <= 1024 * 1024 * 1024 && (
                             <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', color: '#047857', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 링크 만료 기간: <strong>7일 (1주일 후 종료)</strong> — 파일 저장 기간과 동일 적용
+                              🔒 다운로드 가능 기간: <strong>7일 (1주일 후 만료)</strong> — 주소는 유지되며 만료 시 수정에서 재등록 가능
+                            </div>
+                          )}
+                          {newFile.size <= 10 * 1024 * 1024 && (
+                            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(37, 99, 235, 0.3)', color: '#2563eb', fontWeight: 600, fontSize: '0.82rem' }}>
+                              🔒 다운로드 가능 기간: <strong>30일 (1개월 후 만료)</strong> — 주소는 유지되며 만료 시 수정에서 재등록 가능
                             </div>
                           )}
                         </div>
@@ -360,7 +365,7 @@ export default function DashboardPage() {
                     })()}
 
                     <p className="url-form-file-hint" style={{ marginTop: '6px' }}>
-                      최대 5GB까지 모든 파일(영상, 문서, ZIP 등) 지원. 1GB 이하는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다. (실행 파일은 ZIP 압축 권장)
+                      최대 5GB까지 모든 파일(영상, 문서, ZIP 등) 지원. 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다. (단축 주소는 영구 유지)
                     </p>
                   </div>
                 )}
@@ -483,7 +488,24 @@ export default function DashboardPage() {
                             {url.type === 'text'
                               ? (url.text_preview ? `${url.text_preview}...` : '텍스트 메모')
                               : url.type === 'file'
-                                ? (url.file_name || '파일')
+                                ? (
+                                    <span>
+                                      {url.file_name || '파일'}
+                                      {(() => {
+                                        if (!url.expiration_date) return null;
+                                        const isExp = new Date(url.expiration_date) <= new Date();
+                                        return isExp ? (
+                                          <span style={{ marginLeft: '6px', fontSize: '0.72rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', fontWeight: 600 }}>
+                                            만료됨
+                                          </span>
+                                        ) : (
+                                          <span style={{ marginLeft: '6px', fontSize: '0.72rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.12)', color: '#047857', fontWeight: 600 }}>
+                                            보관 중
+                                          </span>
+                                        );
+                                      })()}
+                                    </span>
+                                  )
                                 : url.original_url}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{new Date(url.created_at).toLocaleDateString('ko-KR')}</td>

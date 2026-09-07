@@ -27,7 +27,7 @@ export async function GET(request) {
     // URL 목록
     const { data: urls, error } = await supabase
       .from('short_urls')
-      .select('code, original_url, created_at, visits, last_visit, link_password_hash, type, text_content, file_name, file_size')
+      .select('code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, text_content, file_name, file_size')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + perPage - 1);

@@ -3,6 +3,11 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserFromRequest, hashPassword } from '@/lib/auth';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { deleteShortFile } from '@/lib/shortFiles';
+import { isR2Key } from '@/lib/r2';
+import {
+  R2_SMALL_FOLDER_THRESHOLD_BYTES,
+  R2_LARGE_FOLDER_THRESHOLD_BYTES,
+} from '@/lib/shortFilesShared';
 
 function sanitizeUrlRow(row) {
   if (!row) return row;
@@ -35,7 +40,7 @@ export async function GET(request, { params }) {
     const { data: row, error } = await supabase
       .from('short_urls')
       .select(
-        'id, code, original_url, created_at, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_mime'
+        'id, code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_mime'
       )
       .eq('code', code)
       .eq('user_id', user.id)
@@ -63,16 +68,25 @@ export async function PATCH(request, { params }) {
     const { code: rawCode } = await params;
     const code = decodeCodeParam(rawCode);
     const body = await request.json();
-    const { original_url, custom_code, text_content } = body;
+    const {
+      original_url,
+      custom_code,
+      text_content,
+      new_file_key,
+      new_file_name,
+      new_file_size,
+      new_file_mime,
+      new_public_url,
+    } = body;
     const newCode = typeof custom_code === 'string' ? custom_code.trim() : '';
 
-    // 기존 row 조회 (type 포함)
+    // 기존 row 조회 (type 및 file_path 포함)
     const supabase = getSupabaseAdmin();
 
     const { data: row, error: fetchErr } = await supabase
       .from('short_urls')
       .select(
-        'id, code, original_url, created_at, visits, last_visit, link_password_hash, link_password_unlock_version, type, text_content, file_name, file_size, file_mime'
+        'id, code, original_url, file_path, created_at, expiration_date, visits, last_visit, link_password_hash, link_password_unlock_version, type, text_content, file_name, file_size, file_mime'
       )
       .eq('code', code)
       .eq('user_id', user.id)
@@ -99,7 +113,12 @@ export async function PATCH(request, { params }) {
         }
       }
     } else if (isFileType) {
-      // 파일 타입: 파일 교체 불가, 코드·비밀번호만 수정
+      // 파일 타입: 새 파일이 제공된 경우 R2 키 검증
+      if (new_file_key) {
+        if (!isR2Key(new_file_key)) {
+          return NextResponse.json({ success: false, message: '유효한 스토리지 파일 키가 아닙니다.' }, { status: 400 });
+        }
+      }
     } else {
       // URL 타입: original_url 검증
       const orig = typeof original_url === 'string' ? original_url.trim() : '';
@@ -125,7 +144,29 @@ export async function PATCH(request, { params }) {
       if (text_content !== undefined) {
         updateFields.text_content = text_content;
       }
-    } else if (!isFileType) {
+    } else if (isFileType) {
+      // 파일 타입: 새 파일이 업로드된 경우 기존 파일 삭제 및 파일 정보/다운로드 기간 갱신
+      if (new_file_key) {
+        if (row.file_path) {
+          await deleteShortFile(row.file_path);
+        }
+        updateFields.file_path = new_file_key;
+        updateFields.file_name = new_file_name || 'file';
+        updateFields.file_size = Number(new_file_size) || 0;
+        updateFields.file_mime = new_file_mime || 'application/octet-stream';
+        updateFields.original_url = new_public_url || new_file_key;
+
+        // 새 파일 용량 기준 다운로드 만료일 자동 갱신 (30일 / 7일 / 2일)
+        const newSize = Number(new_file_size) || 0;
+        let retentionMs = 30 * 24 * 60 * 60 * 1000;
+        if (newSize > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
+          retentionMs = 2 * 24 * 60 * 60 * 1000;
+        } else if (newSize > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
+          retentionMs = 7 * 24 * 60 * 60 * 1000;
+        }
+        updateFields.expiration_date = new Date(Date.now() + retentionMs).toISOString();
+      }
+    } else {
       // URL 타입: original_url 업데이트
       updateFields.original_url = typeof original_url === 'string' ? original_url.trim() : row.original_url;
     }
@@ -178,7 +219,7 @@ export async function PATCH(request, { params }) {
       .update(updateFields)
       .eq('id', row.id)
       .eq('user_id', user.id)
-      .select('id, code, original_url, created_at, visits, last_visit, link_password_hash')
+      .select('id, code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, file_name, file_size, file_mime')
       .single();
 
     if (updErr) {
@@ -192,7 +233,7 @@ export async function PATCH(request, { params }) {
     const successMessage = isTextType
       ? '텍스트가 수정되었습니다.'
       : isFileType
-        ? '파일 공유 링크가 수정되었습니다.'
+        ? (new_file_key ? '새 파일이 성공적으로 등록되었으며 다운로드 기간이 갱신되었습니다.' : '파일 공유 링크가 수정되었습니다.')
         : 'URL이 수정되었습니다.';
 
     return NextResponse.json({

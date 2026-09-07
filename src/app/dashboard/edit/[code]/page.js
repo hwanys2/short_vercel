@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { formatFileSize, MAX_FILE_BYTES, getFileCapacityRetentionInfo } from '@/lib/shortFilesShared';
+import { uploadFileToR2Only } from '@/lib/fileUploadClient';
 
 export default function EditUrlPage() {
   const router = useRouter();
@@ -20,12 +22,16 @@ export default function EditUrlPage() {
   const [textContent, setTextContent] = useState('');
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState(null);
+  const [expirationDate, setExpirationDate] = useState(null);
+  const [replacementFile, setReplacementFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [customCode, setCustomCode] = useState('');
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [hadPasswordProtection, setHadPasswordProtection] = useState(false);
   const [linkPassword, setLinkPassword] = useState('');
   const [confirmLinkPassword, setConfirmLinkPassword] = useState('');
   const [error, setError] = useState('');
+  const abortControllerRef = useRef(null);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
 
@@ -63,6 +69,8 @@ export default function EditUrlPage() {
       setTextContent(data.url.text_content || '');
       setFileName(data.url.file_name || '');
       setFileSize(data.url.file_size ?? null);
+      setExpirationDate(data.url.expiration_date || null);
+      setReplacementFile(null);
       setCustomCode(data.url.code);
       const protectedNow = !!data.url.password_enabled;
       setPasswordEnabled(protectedNow);
@@ -109,7 +117,30 @@ export default function EditUrlPage() {
 
       if (urlType === 'text') {
         payload.text_content = textContent;
-      } else if (urlType !== 'file') {
+      } else if (urlType === 'file') {
+        if (replacementFile) {
+          if (replacementFile.size > MAX_FILE_BYTES) {
+            setError(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
+            setSaving(false);
+            return;
+          }
+          const abortController = new AbortController();
+          abortControllerRef.current = abortController;
+          const uploaded = await uploadFileToR2Only({
+            file: replacementFile,
+            customCode: customCode.trim(),
+            onProgress: (prog) => setUploadProgress(prog),
+            signal: abortController.signal,
+            isEdit: true,
+          });
+
+          payload.new_file_key = uploaded.key;
+          payload.new_file_name = uploaded.fileName;
+          payload.new_file_size = uploaded.fileSize;
+          payload.new_file_mime = uploaded.fileMime;
+          payload.new_public_url = uploaded.publicUrl;
+        }
+      } else {
         payload.original_url = originalUrl;
       }
 
@@ -129,10 +160,12 @@ export default function EditUrlPage() {
       }
       alert(data.message || '수정되었습니다.');
       router.replace('/dashboard');
-    } catch {
-      setError('네트워크 오류가 발생했습니다.');
+    } catch (err) {
+      console.error('Save error:', err);
+      setError(err?.message || '네트워크 오류가 발생했습니다.');
     } finally {
       setSaving(false);
+      setUploadProgress(null);
     }
   };
 
@@ -224,19 +257,88 @@ export default function EditUrlPage() {
                     </div>
                   )}
 
-                  {/* 파일 타입: 파일명 표시만 (교체 불가) */}
-                  {isFile && (
-                    <div className="form-group">
-                      <label className="form-label">공유 파일</label>
-                      <div className="form-input" style={{ background: 'var(--bg-muted, #f5f5f8)' }}>
-                        {fileName || '파일'}
-                        {fileSize != null ? ` · ${(fileSize / 1024).toFixed(1)} KB` : ''}
+                  {/* 파일 타입: 현재 파일 상태 및 새 파일 교체 UI */}
+                  {isFile && (() => {
+                    const isExpired = expirationDate && new Date(expirationDate) <= new Date();
+                    return (
+                      <div className="form-group" style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                        <label className="form-label" style={{ fontWeight: 600, fontSize: '0.95rem' }}>공유 파일 정보</label>
+
+                        {/* 현재 등록된 파일 상태 카드 */}
+                        <div style={{ padding: '12px 14px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span style={{ fontWeight: 600, wordBreak: 'break-all' }}>📁 {fileName || '파일'}</span>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                              {fileSize != null ? formatFileSize(fileSize) : ''}
+                            </span>
+                          </div>
+                          {expirationDate && (
+                            <div style={{ marginTop: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                background: isExpired ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                color: isExpired ? '#ef4444' : '#10b981',
+                              }}>
+                                {isExpired ? '🚫 다운로드 기간 만료됨' : '🟢 다운로드 가능'}
+                              </span>
+                              <span style={{ color: 'var(--text-muted)' }}>
+                                보관 만료: {new Date(expirationDate).toLocaleString('ko-KR')}
+                              </span>
+                            </div>
+                          )}
+                          {isExpired && (
+                            <p style={{ margin: '8px 0 0', fontSize: '0.82rem', color: '#ef4444', lineHeight: '1.4' }}>
+                              💡 보관 기간이 만료되어 다운로드가 종료되었습니다. 아래에서 새 파일을 등록하여 저장하시면 다운로드 기간이 다시 늘어납니다!
+                            </p>
+                          )}
+                        </div>
+
+                        {/* 새 파일 등록 / 재등록 인풋 */}
+                        <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '14px' }}>
+                          <label className="form-label" htmlFor="edit-replace-file" style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                            🔄 새 파일로 교체 / 재등록 {isExpired ? '(필수)' : '(선택)'}
+                          </label>
+                          <input
+                            id="edit-replace-file"
+                            type="file"
+                            className="form-input"
+                            onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
+                          />
+                          <p style={{ margin: '6px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
+                            기존 파일을 유지하려면 비워 두세요. 새 파일을 선택하고 저장하면 기존 파일은 자동 삭제되며, 새 파일 용량(10MB 이하 30일, 10MB~1GB 7일, 1GB 초과 2일)에 맞춰 다운로드 기간이 자동으로 연장됩니다.
+                          </p>
+
+                          {/* 새로 선택한 파일 정보 및 기간 안내 */}
+                          {replacementFile && (() => {
+                            const info = getFileCapacityRetentionInfo(replacementFile.size, true);
+                            return (
+                              <div
+                                style={{
+                                  marginTop: '12px',
+                                  padding: '12px',
+                                  background: info.bgColor,
+                                  border: `1px solid ${info.borderColor}`,
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem',
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: '600' }}>선택된 새 파일: {replacementFile.name}</span>
+                                  <span style={{ fontWeight: '700', color: info.color }}>{formatFileSize(replacementFile.size)} ({info.badge})</span>
+                                </div>
+                                <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.4' }}>
+                                  ⏱️ <strong>새 다운로드 기간:</strong> {info.notice} (저장 시 현재 시점부터 연장)
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                      <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        파일 내용은 교체할 수 없습니다. 코드·비밀번호만 수정 가능합니다. 최근 3개월 미접속 시 자동 삭제됩니다.
-                      </p>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <div className="form-group">
                     <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -304,9 +406,35 @@ export default function EditUrlPage() {
                       />
                     </div>
                   </div>
+
+                  {/* 파일 업로드 진행률 바 */}
+                  {uploadProgress && (
+                    <div style={{ margin: '16px 0', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
+                        <span>{uploadProgress.statusText}</span>
+                        <span style={{ color: '#2563eb' }}>{uploadProgress.percent}%</span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${uploadProgress.percent}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                            transition: 'width 0.2s ease',
+                          }}
+                        />
+                      </div>
+                      {uploadProgress.detailText && (
+                        <div style={{ marginTop: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {uploadProgress.detailText}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
                     <button type="submit" className="btn btn-primary" disabled={saving}>
-                      {saving ? '저장 중...' : '저장'}
+                      {saving ? (uploadProgress ? '파일 업로드 및 저장 중...' : '저장 중...') : '저장'}
                     </button>
                     <Link href="/dashboard" className="btn btn-secondary">
                       취소

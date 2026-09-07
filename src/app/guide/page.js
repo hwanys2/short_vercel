@@ -31,20 +31,21 @@ export default function GuidePage() {
           <p>메인 페이지에서 &quot;텍스트 공유&quot; 탭을 선택해 긴 텍스트를 단축 주소로 공유할 수 있습니다.</p>
 
           <h2>3. 파일 공유</h2>
-          <p>문서·이미지·압축파일(ZIP 등)을 단축 주소로 공유할 수 있습니다. (최대 5GB 지원)</p>
+          <p>문서·이미지·압축파일(ZIP 등)을 단축 주소로 공유할 수 있습니다. 모든 파일은 Cloudflare R2 스토리지로 초고속 직접 업로드됩니다. (최대 5GB 지원)</p>
           <ul>
-            <li>허용: PDF, Office, HWP, TXT/HTML/MD/CSV, 이미지(PNG/JPG/GIF/WEBP), 압축파일(ZIP/7Z/TAR/GZ/RAR) 등</li>
-            <li><strong>용량별 수명 주기(자동 삭제) 규칙:</strong>
+            <li>허용: PDF, Office, HWP, TXT/HTML/MD/CSV, 이미지(PNG/JPG/GIF/WEBP), 압축파일(ZIP/7Z/TAR/GZ/RAR) 등 (실행 파일은 ZIP 압축 권장)</li>
+            <li><strong>용량별 수명 주기(보관 및 자동 삭제) 규칙:</strong>
               <ul style={{ marginTop: '6px' }}>
-                <li><strong>1GB 이하 (일반 및 대용량):</strong> 7일간 보관 후 자동 삭제됩니다. (3MB 미만은 Supabase Storage, 3MB 이상은 Cloudflare R2 보관)</li>
-                <li><strong>1GB 초과 ~ 5GB (초대용량):</strong> Cloudflare R2에 업로드되며 대용량 자원 관리를 위해 2일간 보관 후 자동 삭제됩니다.</li>
+                <li><strong>10MB 이하 (일반 파일):</strong> 30일간 보관 후 자동 삭제됩니다. (비회원은 만료 기간 설정 가능, 기본 30일)</li>
+                <li><strong>10MB 초과 ~ 1GB (대용량 파일):</strong> 스토리지 자원 관리를 위해 7일간 보관 후 자동 삭제됩니다.</li>
+                <li><strong>1GB 초과 ~ 5GB (초대용량 파일):</strong> 대용량 자원 보호를 위해 2일간 보관 후 자동 삭제됩니다.</li>
               </ul>
             </li>
-            <li>개인정보 보호와 스토리지 관리를 위해 링크 소멸 시 파일도 함께 완전히 제거됩니다.</li>
+            <li><strong>회원 파일 공유의 장점:</strong> 회원의 단축 주소는 영구 보존됩니다. 파일 보관 기간이 만료되더라도 대시보드 [수정]에서 새 파일을 언제든 재등록할 수 있으며, 새 파일을 올리면 다운로드 기간이 자동으로 다시 연장됩니다.</li>
           </ul>
 
           <h2>4. 회원 URL 단축 (영구)</h2>
-          <p>회원가입 후 로그인하면 영구적으로 유지되는 URL·텍스트를 만들 수 있습니다. (파일은 위 3번 정책 적용)</p>
+          <p>회원가입 후 로그인하면 영구적으로 유지되는 URL·텍스트를 만들 수 있습니다. (파일 공유는 단축 주소가 유지되며 위 3번의 보관 기간 및 재등록 기능 적용)</p>
           <ol>
             <li>회원가입 또는 로그인을 합니다.</li>
             <li>메인 페이지 또는 대시보드에서 단축 주소를 생성합니다.</li>
