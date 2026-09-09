@@ -89,16 +89,6 @@ export default function Footer({ suppressAdSense = false }) {
                     학급 상벌점 관리 ClassPoint
                   </a>
                 </li>
-                <li>
-                  <a href="https://oxit.run" target="_blank" rel="noopener noreferrer" className="footer-link">
-                    실시간 O/X와 워드클라우드
-                  </a>
-                </li>
-                <li>
-                  <a href="https://maramap.kr" target="_blank" rel="noopener noreferrer" className="footer-link">
-                    마라톤 정보 확인
-                  </a>
-                </li>
               </ul>
             </section>
           </div>
