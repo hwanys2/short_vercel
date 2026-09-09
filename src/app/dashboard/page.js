@@ -11,6 +11,7 @@ import {
   getFileCapacityRetentionInfo,
 } from '@/lib/shortFilesShared';
 import { uploadShortFileAuto } from '@/lib/fileUploadClient';
+import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -76,6 +77,14 @@ export default function DashboardPage() {
   // 회원탈퇴 모달
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+
+  // 비밀번호 변경 모달
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
 
@@ -256,6 +265,60 @@ export default function DashboardPage() {
       }
     } catch {
       alert('회원탈퇴 중 오류가 발생했습니다.');
+    }
+  };
+
+  const openPasswordModal = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setNewPasswordConfirm('');
+    setPasswordError('');
+    setShowPasswordModal(true);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    if (!currentPassword || !newPassword || !newPasswordConfirm) {
+      setPasswordError('모든 필드를 입력해주세요.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('새 비밀번호는 최소 8자 이상이어야 합니다.');
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setPasswordError('새 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          new_password_confirm: newPasswordConfirm,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setPasswordError(data.message || '비밀번호 변경에 실패했습니다.');
+        return;
+      }
+      setShowPasswordModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setNewPasswordConfirm('');
+      setMessage('비밀번호가 변경되었습니다.');
+      setMessageType('success');
+    } catch {
+      setPasswordError('네트워크 오류가 발생했습니다.');
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -643,15 +706,119 @@ export default function DashboardPage() {
 
           {/* Actions */}
           <div style={{ textAlign: 'center', marginTop: '32px' }}>
-            <button onClick={() => { fetch('/api/auth/logout', { method: 'POST' }).then(() => router.push('/')); }} className="btn btn-danger btn-sm">
-              로그아웃
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={openPasswordModal}>
+                비밀번호 변경
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  fetch('/api/auth/logout', { method: 'POST' }).then(() => router.push('/'));
+                }}
+                className="btn btn-danger btn-sm"
+              >
+                로그아웃
+              </button>
+            </div>
             <div style={{ marginTop: '16px' }}>
               <button onClick={() => setShowDeleteModal(true)} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', opacity: 0.6 }}>
                 회원탈퇴
               </button>
             </div>
           </div>
+
+          {/* 비밀번호 변경 모달 */}
+          {showPasswordModal && (
+            <div
+              className="modal-overlay"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !passwordSaving) setShowPasswordModal(false);
+              }}
+            >
+              <div className="modal">
+                <div className="modal-header">
+                  <h3>비밀번호 변경</h3>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon"
+                    onClick={() => !passwordSaving && setShowPasswordModal(false)}
+                    aria-label="닫기"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <form onSubmit={handleChangePassword}>
+                  <div className="modal-body">
+                    {passwordError && (
+                      <div className="alert alert-danger" style={{ marginBottom: '12px' }}>
+                        {passwordError}
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="dash-current-password">
+                        현재 비밀번호
+                      </label>
+                      <input
+                        id="dash-current-password"
+                        type="password"
+                        className="form-input"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(sanitizeAsciiPasswordInput(e.target.value))}
+                        autoComplete="current-password"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="dash-new-password">
+                        새 비밀번호
+                      </label>
+                      <input
+                        id="dash-new-password"
+                        type="password"
+                        className="form-input"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(sanitizeAsciiPasswordInput(e.target.value))}
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                      />
+                      <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        8자 이상
+                      </p>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="dash-new-password-confirm">
+                        새 비밀번호 확인
+                      </label>
+                      <input
+                        id="dash-new-password-confirm"
+                        type="password"
+                        className="form-input"
+                        value={newPasswordConfirm}
+                        onChange={(e) => setNewPasswordConfirm(sanitizeAsciiPasswordInput(e.target.value))}
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowPasswordModal(false)}
+                      disabled={passwordSaving}
+                    >
+                      취소
+                    </button>
+                    <button type="submit" className="btn btn-primary" disabled={passwordSaving}>
+                      {passwordSaving ? '변경 중...' : '변경하기'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* 회원탈퇴 모달 */}
           {showDeleteModal && (
