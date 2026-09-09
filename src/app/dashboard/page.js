@@ -22,6 +22,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  const [appliedQ, setAppliedQ] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [fileStatus, setFileStatus] = useState('all');
 
   // 새 URL 생성 폼
   const [newUrl, setNewUrl] = useState('');
@@ -90,12 +94,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user) fetchUrls();
-  }, [user, page]);
+  }, [user, page, appliedQ, filterType, fileStatus]);
 
   const fetchUrls = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/urls?page=${page}&per_page=10`);
+      const params = new URLSearchParams({
+        page: String(page),
+        per_page: '10',
+      });
+      if (appliedQ) params.set('q', appliedQ);
+      if (filterType && filterType !== 'all') params.set('type', filterType);
+      if (fileStatus && fileStatus !== 'all') params.set('file_status', fileStatus);
+
+      const res = await fetch(`/api/urls?${params}`);
       const data = await res.json();
       if (data.success) {
         setUrls(data.urls);
@@ -105,6 +117,12 @@ export default function DashboardPage() {
     } catch {} finally {
       setLoading(false);
     }
+  };
+
+  const applySearch = (e) => {
+    e?.preventDefault?.();
+    setPage(1);
+    setAppliedQ(searchQ.trim());
   };
 
   const handleCreate = async (e) => {
@@ -446,6 +464,77 @@ export default function DashboardPage() {
               🔗 내 URL 목록 <span style={{ color: 'var(--text-muted)', fontWeight: '400', marginLeft: '8px' }}>({total}개)</span>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
+              <div className="dashboard-filters">
+                <form className="dashboard-search-form" onSubmit={applySearch}>
+                  <input
+                    type="search"
+                    className="form-input"
+                    placeholder="코드·파일명·URL·텍스트 검색"
+                    value={searchQ}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    aria-label="단축 주소 검색"
+                  />
+                  <button type="submit" className="btn btn-secondary btn-sm">검색</button>
+                  {(appliedQ || filterType !== 'all' || fileStatus !== 'all') && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setSearchQ('');
+                        setAppliedQ('');
+                        setFilterType('all');
+                        setFileStatus('all');
+                        setPage(1);
+                      }}
+                    >
+                      초기화
+                    </button>
+                  )}
+                </form>
+                <div className="dashboard-filter-chips" role="group" aria-label="타입 필터">
+                  {[
+                    { id: 'all', label: '전체' },
+                    { id: 'url', label: 'URL' },
+                    { id: 'text', label: '텍스트' },
+                    { id: 'file', label: '파일' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`dash-chip ${filterType === t.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setFilterType(t.id);
+                        setPage(1);
+                        if (t.id !== 'file' && fileStatus !== 'all') setFileStatus('all');
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {(filterType === 'all' || filterType === 'file') && (
+                  <div className="dashboard-filter-chips" role="group" aria-label="파일 만료 필터">
+                    {[
+                      { id: 'all', label: '파일 상태: 전체' },
+                      { id: 'expiring', label: '2일 내 만료' },
+                      { id: 'expired', label: '만료됨' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={`dash-chip ${fileStatus === t.id ? 'is-active' : ''} ${t.id === 'expired' ? 'is-danger' : t.id === 'expiring' ? 'is-warn' : ''}`}
+                        onClick={() => {
+                          setFileStatus(t.id);
+                          if (t.id !== 'all') setFilterType('file');
+                          setPage(1);
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
                   <span className="spinner" style={{ borderTopColor: 'var(--primary)' }} />
@@ -453,8 +542,8 @@ export default function DashboardPage() {
               ) : urls.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon">📂</div>
-                  <h3>아직 생성된 URL이 없습니다</h3>
-                  <p>위 폼을 사용하여 첫 번째 영구 URL을 만들어보세요!</p>
+                  <h3>{appliedQ || filterType !== 'all' || fileStatus !== 'all' ? '검색 결과가 없습니다' : '아직 생성된 URL이 없습니다'}</h3>
+                  <p>{appliedQ || filterType !== 'all' || fileStatus !== 'all' ? '다른 조건으로 다시 검색해 보세요.' : '위 폼을 사용하여 첫 번째 영구 URL을 만들어보세요!'}</p>
                 </div>
               ) : (
                 <div className="table-wrapper">
@@ -491,25 +580,24 @@ export default function DashboardPage() {
                                 ? (
                                     <span>
                                       {url.file_name || '파일'}
-                                      {(() => {
-                                        if (!url.expiration_date) return null;
-                                        const isExp = new Date(url.expiration_date) <= new Date();
-                                        return isExp ? (
-                                          <span style={{ marginLeft: '6px', fontSize: '0.72rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', fontWeight: 600 }}>
-                                            만료됨
-                                          </span>
-                                        ) : (
-                                          <span style={{ marginLeft: '6px', fontSize: '0.72rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.12)', color: '#047857', fontWeight: 600 }}>
-                                            보관 중
-                                          </span>
-                                        );
-                                      })()}
+                                      {url.file_retention === 'expired' ? (
+                                          <span className="dash-retention-badge is-expired">만료됨</span>
+                                        ) : url.file_retention === 'expiring' ? (
+                                          <span className="dash-retention-badge is-expiring">곧 만료</span>
+                                        ) : url.file_retention === 'active' ? (
+                                          <span className="dash-retention-badge is-active">보관 중</span>
+                                        ) : null}
                                     </span>
                                   )
                                 : url.original_url}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{new Date(url.created_at).toLocaleDateString('ko-KR')}</td>
-                          <td>{url.visits}</td>
+                          <td>
+                            <div className="dash-visits-cell">
+                              <span>{url.visits}</span>
+                              <MiniVisitBars series={url.visits_7d} />
+                            </div>
+                          </td>
                           <td>
                             <div className="url-actions">
                               <Link
@@ -598,5 +686,37 @@ export default function DashboardPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+function MiniVisitBars({ series }) {
+  const byDay = new Map((series || []).map((s) => [s.day, s.count]));
+  const days = [];
+  const now = Date.now();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now - i * 24 * 60 * 60 * 1000);
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(d);
+    const y = parts.find((p) => p.type === 'year')?.value;
+    const m = parts.find((p) => p.type === 'month')?.value;
+    const day = parts.find((p) => p.type === 'day')?.value;
+    days.push(`${y}-${m}-${day}`);
+  }
+  const counts = days.map((day) => byDay.get(day) || 0);
+  const max = Math.max(1, ...counts);
+  return (
+    <div className="mini-visit-bars" title="최근 7일 클릭" aria-hidden="true">
+      {counts.map((c, i) => (
+        <span
+          key={days[i]}
+          className="mini-visit-bar"
+          style={{ height: `${Math.max(2, Math.round((c / max) * 16))}px` }}
+        />
+      ))}
+    </div>
   );
 }

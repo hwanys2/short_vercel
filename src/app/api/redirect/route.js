@@ -52,7 +52,7 @@ export async function GET(request) {
           if (isValidLinkUnlockCookie(request, username, code, unlockVersion)) {
             originalUrl = urlData.original_url;
             urlType = urlData.type || 'url';
-            supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+            supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
           } else {
             const gate = new URL('/link-gate', request.url);
             gate.searchParams.set('username', username);
@@ -62,7 +62,7 @@ export async function GET(request) {
         } else {
           originalUrl = urlData.original_url;
           urlType = urlData.type || 'url';
-          supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+          supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
         }
       }
     } else {
@@ -84,7 +84,7 @@ export async function GET(request) {
           if (isValidLinkUnlockCookie(request, '', code, unlockVersion)) {
             originalUrl = urlData.original_url;
             urlType = urlData.type || 'url';
-            supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+            supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
           } else {
             const gate = new URL('/link-gate', request.url);
             gate.searchParams.set('code', code);
@@ -93,7 +93,7 @@ export async function GET(request) {
         } else {
           originalUrl = urlData.original_url;
           urlType = urlData.type || 'url';
-          supabase.rpc('increment_short_url_visits', { url_id: urlData.id }).then(() => {});
+          supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
         }
       }
     }

@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { buildShortUrl } from '@/lib/siteUrl';
@@ -14,6 +17,7 @@ export default function TextViewContent() {
 
   const [originalContent, setOriginalContent] = useState('');
   const [editableContent, setEditableContent] = useState('');
+  const [mode, setMode] = useState('view'); // 'view' | 'edit'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -49,7 +53,6 @@ export default function TextViewContent() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2400);
     } catch {
-      // Fallback for older browsers
       if (fallbackRef.current) {
         fallbackRef.current.select();
         document.execCommand('copy');
@@ -117,7 +120,6 @@ export default function TextViewContent() {
       <main>
         <div className="text-viewer-page">
           <div className="text-viewer-card">
-            {/* Header */}
             <div className="text-viewer-header">
               <div className="text-viewer-header-left">
                 <div className="text-viewer-icon">📋</div>
@@ -136,45 +138,60 @@ export default function TextViewContent() {
                   </div>
                 </div>
               </div>
-              <button
-                className={`btn text-viewer-copy-btn ${copied ? 'is-copied' : 'btn-primary'}`}
-                onClick={handleCopy}
-                type="button"
-              >
-                {copied ? (
-                  <>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    복사 완료!
-                  </>
-                ) : (
-                  <>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
-                    복사하기
-                  </>
-                )}
-              </button>
+              <div className="text-viewer-header-actions">
+                <div className="text-viewer-mode-tabs" role="tablist" aria-label="보기 모드">
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`text-viewer-mode-tab ${mode === 'view' ? 'is-active' : ''}`}
+                    aria-selected={mode === 'view'}
+                    onClick={() => setMode('view')}
+                  >
+                    마크다운
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`text-viewer-mode-tab ${mode === 'edit' ? 'is-active' : ''}`}
+                    aria-selected={mode === 'edit'}
+                    onClick={() => setMode('edit')}
+                  >
+                    편집
+                  </button>
+                </div>
+                <button
+                  className={`btn text-viewer-copy-btn ${copied ? 'is-copied' : 'btn-primary'}`}
+                  onClick={handleCopy}
+                  type="button"
+                >
+                  {copied ? '복사 완료!' : '복사하기'}
+                </button>
+              </div>
             </div>
 
-            {/* Text Content — locally editable before copy */}
             <p className="text-viewer-edit-hint">
-              복사 전 내용을 자유롭게 수정할 수 있습니다. 원본 데이터는 변경되지 않습니다.
+              {mode === 'view'
+                ? '마크다운으로 렌더링됩니다. 편집 탭에서 복사 전 내용을 수정할 수 있습니다. 원본은 변경되지 않습니다.'
+                : '복사 전 내용을 자유롭게 수정할 수 있습니다. 원본 데이터는 변경되지 않습니다.'}
             </p>
             <div className="text-viewer-body">
-              <textarea
-                className="text-viewer-content text-viewer-editor"
-                value={editableContent}
-                onChange={(e) => setEditableContent(e.target.value)}
-                spellCheck={false}
-                aria-label="공유된 텍스트 (복사 전 수정 가능)"
-              />
+              {mode === 'view' ? (
+                <div className="text-viewer-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                    {editableContent || ' '}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <textarea
+                  className="text-viewer-content text-viewer-editor"
+                  value={editableContent}
+                  onChange={(e) => setEditableContent(e.target.value)}
+                  spellCheck={false}
+                  aria-label="공유된 텍스트 (복사 전 수정 가능)"
+                />
+              )}
             </div>
 
-            {/* Footer bar */}
             <div className="text-viewer-footer">
               <div className="text-viewer-source">
                 <span className="text-viewer-source-label">단축 주소</span>
@@ -204,7 +221,6 @@ export default function TextViewContent() {
             </div>
           </div>
 
-          {/* Branding */}
           <p className="text-viewer-branding">
             <Link href="/">숏.한국</Link>으로 텍스트·URL을 간편하게 공유하세요
           </p>
@@ -212,7 +228,6 @@ export default function TextViewContent() {
       </main>
       <Footer />
 
-      {/* Hidden textarea fallback for copy */}
       <textarea
         ref={fallbackRef}
         value={editableContent}

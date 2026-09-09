@@ -63,13 +63,34 @@ CREATE TRIGGER trigger_short_users_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_short_users_updated_at();
 
--- 4. 방문 횟수 증가 RPC 함수
-CREATE OR REPLACE FUNCTION increment_short_url_visits(url_id BIGINT)
+-- 4. 방문 횟수 증가 RPC 함수 (+ KST 일별 집계)
+CREATE TABLE IF NOT EXISTS short_url_visits_daily (
+  url_id BIGINT NOT NULL REFERENCES short_urls(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (url_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_short_url_visits_daily_day
+  ON short_url_visits_daily (day);
+
+DROP FUNCTION IF EXISTS increment_short_url_visits(BIGINT);
+
+CREATE FUNCTION increment_short_url_visits(p_url_id BIGINT)
 RETURNS VOID AS $$
+DECLARE
+  kst_day DATE;
 BEGIN
-  UPDATE short_urls 
-  SET visits = visits + 1, last_visit = NOW() 
-  WHERE id = url_id;
+  UPDATE short_urls
+  SET visits = COALESCE(visits, 0) + 1, last_visit = NOW()
+  WHERE id = p_url_id;
+
+  kst_day := (NOW() AT TIME ZONE 'Asia/Seoul')::date;
+
+  INSERT INTO short_url_visits_daily (url_id, day, count)
+  VALUES (p_url_id, kst_day, 1)
+  ON CONFLICT (url_id, day)
+  DO UPDATE SET count = short_url_visits_daily.count + 1;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -163,6 +184,7 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- 자동 정리: Vercel Cron → /api/cron/cleanup (CRON_SECRET)
 -- (A) 비회원: expiration_date < NOW() → DB 삭제 (+ type=file 이면 Storage도 삭제)
--- (B) 회원 파일만: COALESCE(last_visit, created_at) < NOW() - 3 months → 링크·파일 삭제
+-- (B) 회원 파일 만료: expiration_date < NOW() 이고 file_path 있음 → R2만 삭제, 행 유지(file_path=null)
+-- (C) 회원 파일만: COALESCE(last_visit, created_at) < NOW() - 3 months → 링크·파일 삭제
 
 SELECT 'Supabase 테이블 생성 완료!';

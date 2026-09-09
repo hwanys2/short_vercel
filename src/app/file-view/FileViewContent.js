@@ -101,6 +101,16 @@ export default function FileViewContent() {
     return `/api/file-download?${params}`;
   })();
 
+  const previewHref = (() => {
+    const params = new URLSearchParams({ code: code || '', inline: '1' });
+    if (username) params.set('username', username);
+    return `/api/file-download?${params}`;
+  })();
+
+  const isImagePreview =
+    meta?.previewable && meta?.file_mime?.startsWith('image/') && !meta.file_mime.includes('svg');
+  const isPdfPreview = meta?.previewable && meta?.file_mime === 'application/pdf';
+
   const expirationInfo = useMemo(() => {
     if (!meta) return null;
     const expDateStr = meta.expiration_date;
@@ -313,6 +323,25 @@ export default function FileViewContent() {
                 </div>
               </div>
 
+              {!isExpired && (isImagePreview || isPdfPreview) && (
+                <div className="file-view-preview">
+                  {isImagePreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewHref}
+                      alt={meta.file_name || '미리보기'}
+                      className="file-view-preview-image"
+                    />
+                  ) : (
+                    <iframe
+                      title={meta.file_name || 'PDF 미리보기'}
+                      src={previewHref}
+                      className="file-view-preview-pdf"
+                    />
+                  )}
+                </div>
+              )}
+
               {/* 다운로드 가능 시간 및 만료 안내 카드 */}
               {expirationInfo?.isIndefinite ? (
                 <div className="file-view-expiry-card is-indefinite">
@@ -384,14 +413,14 @@ export default function FileViewContent() {
                       <>
                         <strong>{expirationInfo?.deadlineFormatted}</strong>에 다운로드가 종료되었습니다.
                         <span className="file-view-expiry-sub">
-                          보관 기간이 만료되어 파일이 자동 삭제되었으며 더 이상 다운로드할 수 없습니다.
+                          저장본이 삭제되어 더 이상 다운로드할 수 없습니다. 게시자가 같은 단축 주소에 새 파일을 등록하면 다시 받을 수 있습니다.
                         </span>
                       </>
                     ) : (
                       <>
                         <strong>{expirationInfo?.deadlineFormatted}</strong>까지 다운로드할 수 있습니다.
                         <span className="file-view-expiry-sub">
-                          💡 설정된 만료 기한이 지나면 파일이 서버에서 영구 삭제되며 다운로드가 자동으로 차단됩니다.
+                          💡 만료되면 다운로드가 차단되고 저장본이 삭제됩니다. 단축 주소는 유지되며 게시자가 수정에서 재등록할 수 있습니다.
                         </span>
                       </>
                     )}

@@ -32,6 +32,10 @@ export default function EditUrlPage() {
   const [confirmLinkPassword, setConfirmLinkPassword] = useState('');
   const [error, setError] = useState('');
   const abortControllerRef = useRef(null);
+  const [visitDays, setVisitDays] = useState(30);
+  const [visitSeries, setVisitSeries] = useState([]);
+  const [visitTotal, setVisitTotal] = useState(0);
+  const [visitsLoading, setVisitsLoading] = useState(false);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
 
@@ -87,6 +91,28 @@ export default function EditUrlPage() {
   useEffect(() => {
     if (user) loadUrl();
   }, [user, loadUrl]);
+
+  useEffect(() => {
+    if (!user || !routeCode) return;
+    let ignore = false;
+    setVisitsLoading(true);
+    fetch(`/api/urls/${encodeURIComponent(routeCode)}/visits?days=${visitDays}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (ignore) return;
+        if (data.success) {
+          setVisitSeries(data.series || []);
+          setVisitTotal(data.visits_total || 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!ignore) setVisitsLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [user, routeCode, visitDays]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -444,9 +470,66 @@ export default function EditUrlPage() {
               )}
             </div>
           </div>
+
+          <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
+            <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <span>클릭 통계 (총 {visitTotal.toLocaleString()}회)</span>
+              <div className="dashboard-filter-chips" role="group" aria-label="기간">
+                <button
+                  type="button"
+                  className={`dash-chip ${visitDays === 7 ? 'is-active' : ''}`}
+                  onClick={() => setVisitDays(7)}
+                >
+                  7일
+                </button>
+                <button
+                  type="button"
+                  className={`dash-chip ${visitDays === 30 ? 'is-active' : ''}`}
+                  onClick={() => setVisitDays(30)}
+                >
+                  30일
+                </button>
+              </div>
+            </div>
+            <div className="card-body">
+              {visitsLoading ? (
+                <div style={{ textAlign: 'center', padding: '24px' }}>
+                  <span className="spinner" style={{ borderTopColor: 'var(--primary)' }} />
+                </div>
+              ) : (
+                <>
+                  <VisitBarChart series={visitSeries} />
+                  <p className="visit-chart-note">
+                    일별 클릭은 기능 배포 이후부터 집계됩니다. 이전 누적 클릭은 총합에만 포함됩니다.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </main>
       <Footer />
     </>
+  );
+}
+
+function VisitBarChart({ series }) {
+  const counts = (series || []).map((s) => s.count || 0);
+  const max = Math.max(1, ...counts);
+  if (!series?.length) {
+    return <p style={{ color: 'var(--text-muted)', margin: 0 }}>표시할 데이터가 없습니다.</p>;
+  }
+  return (
+    <div className="visit-bar-chart" role="img" aria-label="일별 클릭 막대 그래프">
+      {series.map((s) => (
+        <div key={s.day} className="visit-bar-col" title={`${s.day}: ${s.count}회`}>
+          <div
+            className="visit-bar"
+            style={{ height: `${Math.max(s.count > 0 ? 8 : 2, Math.round((s.count / max) * 120))}px` }}
+          />
+          <span className="visit-bar-label">{s.day.slice(5)}</span>
+        </div>
+      ))}
+    </div>
   );
 }

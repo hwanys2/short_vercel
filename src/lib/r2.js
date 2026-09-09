@@ -1,6 +1,7 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   PutBucketCorsCommand,
@@ -183,6 +184,41 @@ export async function configureR2BucketCors() {
     // API 토큰이 Object Read/Write 전용인 경우 권한 부족 오류(403) 발생 가능 -> 대시보드 수동 설정 안내로 보완
     return { ok: false, error: error.message };
   }
+}
+
+/**
+ * R2 객체 다운로드/미리보기용 Presigned GET URL
+ * @param {{ key: string; fileName?: string; inline?: boolean; expiresIn?: number; contentType?: string }} opts
+ */
+export async function createR2PresignedGetUrl({
+  key,
+  fileName,
+  inline = false,
+  expiresIn = 120,
+  contentType,
+}) {
+  const objectKey = extractR2Key(key);
+  if (!objectKey || !isR2Key(objectKey)) {
+    throw new Error('Invalid R2 key');
+  }
+
+  const s3 = getR2Client();
+  const bucket = getR2BucketName();
+  const safeName = String(fileName || 'file')
+    .replace(/[\r\n"]/g, '_')
+    .slice(0, 180);
+  const disposition = inline
+    ? `inline; filename*=UTF-8''${encodeURIComponent(safeName)}`
+    : `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`;
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    ResponseContentDisposition: disposition,
+    ...(contentType ? { ResponseContentType: contentType } : {}),
+  });
+
+  return getSignedUrl(s3, command, { expiresIn });
 }
 
 /**

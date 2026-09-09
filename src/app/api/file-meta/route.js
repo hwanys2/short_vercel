@@ -56,12 +56,13 @@ async function loadFileRow(request) {
     unlockUsername = '';
   }
 
-  if (!urlData || urlData.type !== 'file' || !urlData.file_path) {
+  if (!urlData || urlData.type !== 'file') {
     return { error: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
   }
 
   const isExpired =
-    urlData.expiration_date && new Date(urlData.expiration_date) <= new Date();
+    !urlData.file_path ||
+    (urlData.expiration_date && new Date(urlData.expiration_date) <= new Date());
 
   if (isExpired) {
     return {
@@ -105,10 +106,22 @@ export async function GET(request) {
       file_mime: urlData.file_mime,
       expiration_date: urlData.expiration_date,
       created_at: urlData.created_at,
+      previewable: isPreviewable(urlData.file_mime, urlData.file_size),
       server_time: new Date().toISOString(),
     });
   } catch (error) {
     console.error('File meta fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+const PREVIEW_MAX_BYTES = 20 * 1024 * 1024;
+
+function isPreviewable(mime, size) {
+  const n = Number(size) || 0;
+  if (n <= 0 || n > PREVIEW_MAX_BYTES) return false;
+  if (!mime) return false;
+  if (mime.startsWith('image/') && !mime.includes('svg')) return true;
+  if (mime === 'application/pdf') return true;
+  return false;
 }

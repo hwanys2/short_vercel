@@ -1,26 +1,21 @@
-import { Suspense } from 'react';
-import FileViewContent from './FileViewContent';
+import Link from 'next/link';
 import { loadLinkPreviewData, absoluteOgImageUrl } from '@/lib/linkPreview';
 
 export async function generateMetadata({ searchParams }) {
   const params = await searchParams;
   const code = typeof params?.code === 'string' ? params.code : '';
   const username = typeof params?.username === 'string' ? params.username : '';
-  if (!code) {
-    return {
-      title: '파일 다운로드 | 숏.한국',
-      description: '숏.한국 단축 주소로 공유된 파일을 다운로드합니다.',
-      robots: { index: false, follow: false },
-    };
-  }
   const data = await loadLinkPreviewData({ code, username: username || undefined });
+
   if (!data) {
     return {
-      title: '파일 다운로드 | 숏.한국',
+      title: '숏.한국',
       robots: { index: false, follow: false },
     };
   }
+
   const ogImage = absoluteOgImageUrl(data.ogImagePath);
+
   return {
     title: data.title,
     description: data.description,
@@ -43,23 +38,28 @@ export async function generateMetadata({ searchParams }) {
   };
 }
 
-export default function FileViewPage() {
+export default async function LinkPreviewPage({ searchParams }) {
+  const params = await searchParams;
+  const code = typeof params?.code === 'string' ? params.code : '';
+  const username = typeof params?.username === 'string' ? params.username : '';
+  const data = await loadLinkPreviewData({ code, username: username || undefined });
+
   return (
-    <Suspense
-      fallback={
-        <main>
-          <div className="text-viewer-page">
-            <div className="text-viewer-card">
-              <div className="text-viewer-loading">
-                <span className="spinner" style={{ borderTopColor: 'var(--primary)' }} />
-                <p>파일을 불러오는 중...</p>
-              </div>
-            </div>
-          </div>
-        </main>
-      }
-    >
-      <FileViewContent />
-    </Suspense>
+    <main style={{ padding: '48px 24px', maxWidth: 560, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+      <h1 style={{ fontSize: '1.35rem', marginBottom: 12 }}>{data?.title || '숏.한국'}</h1>
+      <p style={{ color: '#64748b', lineHeight: 1.6, marginBottom: 24 }}>
+        {data?.description || '단축 주소 미리보기입니다.'}
+      </p>
+      {data?.shortUrl && (
+        <p style={{ marginBottom: 16 }}>
+          <a href={data.shortUrl} style={{ color: '#2563eb' }}>
+            {data.shortUrl}
+          </a>
+        </p>
+      )}
+      <Link href="/" style={{ color: '#64748b' }}>
+        숏.한국 홈
+      </Link>
+    </main>
   );
 }
