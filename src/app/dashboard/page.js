@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import UrlResult from '@/components/UrlResult';
 import { buildShortUrl } from '@/lib/siteUrl';
 import {
   formatFileSize,
@@ -36,7 +37,9 @@ export default function DashboardPage() {
   const [newFile, setNewFile] = useState(null);
   const [creating, setCreating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
+  const [createResult, setCreateResult] = useState(null);
   const abortControllerRef = useRef(null);
+  const createResultRef = useRef(null);
 
   // 업로드 도중 창 닫기/새로고침 방지
   useEffect(() => {
@@ -136,10 +139,19 @@ export default function DashboardPage() {
     setAppliedQ(searchQ.trim());
   };
 
+  useEffect(() => {
+    if (!createResult) return;
+    const id = requestAnimationFrame(() => {
+      createResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [createResult]);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setCreating(true);
     setMessage('');
+    setCreateResult(null);
     try {
       if (newMode === 'file') {
         if (!newFile) {
@@ -163,7 +175,7 @@ export default function DashboardPage() {
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
 
-        await uploadShortFileAuto({
+        const uploaded = await uploadShortFileAuto({
           file: newFile,
           customCode: newCode.trim(),
           expireDuration: fileExpireDuration,
@@ -174,8 +186,22 @@ export default function DashboardPage() {
           signal: abortController.signal,
         });
 
-        setMessage('파일 공유 주소가 성공적으로 생성되었습니다.');
-        setMessageType('success');
+        const resultData =
+          uploaded?.data ||
+          (uploaded?.short_url
+            ? uploaded
+            : {
+                short_url: buildShortUrl({
+                  baseUrl,
+                  code: newCode.trim(),
+                  username: user.username,
+                }),
+                type: 'file',
+                expiration_date: null,
+              });
+
+        setCreateResult(resultData);
+        setMessage('');
         setNewCode('');
         setNewFile(null);
         if (document.getElementById('dash-file')) {
@@ -201,8 +227,19 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage(newMode === 'text' ? '텍스트 공유 주소가 성공적으로 생성되었습니다.' : 'URL이 성공적으로 생성되었습니다.');
-        setMessageType('success');
+        const resultData =
+          data.data ||
+          {
+            short_url: buildShortUrl({
+              baseUrl,
+              code: newCode.trim(),
+              username: user.username,
+            }),
+            type: newMode,
+            expiration_date: null,
+          };
+        setCreateResult(resultData);
+        setMessage('');
         setNewUrl('');
         setNewCode('');
         setNewText('');
@@ -351,6 +388,25 @@ export default function DashboardPage() {
                   💡 <strong>Cloudflare R2 CORS 설정 팁:</strong> Cloudflare R2 버킷(<code>short-kr-files</code>) &gt; Settings &gt; CORS Policy에 AllowedOrigins: <code>[&quot;*&quot;]</code>, AllowedMethods: <code>[&quot;GET&quot;, &quot;PUT&quot;, &quot;HEAD&quot;]</code> 설정을 확인해주세요.
                 </div>
               )}
+            </div>
+          )}
+
+          {createResult && (
+            <div
+              ref={createResultRef}
+              className="home-shorten-result"
+              style={{ maxWidth: '800px', margin: '0 auto 24px' }}
+            >
+              <UrlResult data={createResult} user={user} />
+              <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setCreateResult(null)}
+                >
+                  결과 닫고 새로 만들기
+                </button>
+              </div>
             </div>
           )}
 

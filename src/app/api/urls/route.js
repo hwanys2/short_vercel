@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
+import { buildShortUrl } from '@/lib/siteUrl';
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -222,7 +223,19 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'URL 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, message: 'URL이 성공적으로 생성되었습니다.' });
+    const shortUrl = buildShortUrl({ code, username: user.username });
+
+    return NextResponse.json({
+      success: true,
+      message: 'URL이 성공적으로 생성되었습니다.',
+      data: {
+        short_url: shortUrl,
+        code,
+        type,
+        expiration_date: expirationDate,
+        username: user.username,
+      },
+    });
   } catch (error) {
     console.error('Create URL error:', error);
     return NextResponse.json({ success: false, message: '오류가 발생했습니다.' }, { status: 500 });
