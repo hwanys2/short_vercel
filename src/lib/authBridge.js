@@ -25,6 +25,8 @@ export const RESERVED_USERNAMES = new Set([
   'ads.txt',
   '_next',
   'admin',
+  'profile',
+  'unsubscribe',
   'www',
   'static',
 ]);

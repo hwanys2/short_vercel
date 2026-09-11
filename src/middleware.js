@@ -15,6 +15,9 @@ const STATIC_PATHS = [
   '/register',
   '/dashboard',
   '/onboarding',
+  '/profile',
+  '/admin',
+  '/unsubscribe',
   '/auth',
   '/faq',
   '/guide',
@@ -39,8 +42,12 @@ function needsAuthRefresh(pathname) {
     pathname.startsWith('/register') ||
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/profile') ||
+    pathname.startsWith('/admin') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/admin') ||
+    pathname.startsWith('/api/profile') ||
     pathname.startsWith('/api/urls') ||
     pathname.startsWith('/api/shorten') ||
     pathname.startsWith('/api/check-code') ||

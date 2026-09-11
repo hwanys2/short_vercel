@@ -249,6 +249,152 @@ a:hover {
   box-shadow: var(--shadow-sm);
 }
 
+.nav-text-link {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.nav-text-link:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.account-menu {
+  position: relative;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 160px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.account-chip:hover {
+  border-color: var(--border-light);
+  background: var(--bg-card-hover);
+}
+
+.account-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-chip-caret {
+  opacity: 0.65;
+  font-size: 0.7rem;
+}
+
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.account-dropdown-item:hover {
+  background: var(--surface);
+}
+
+.account-dropdown-danger {
+  color: var(--danger);
+}
+
+.account-dropdown-mobile-only {
+  display: none;
+}
+
+.mail-consent-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.mail-consent-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.mail-consent-row:first-child {
+  padding-top: 0;
+}
+
+.mail-consent-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.mail-consent-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.mail-consent-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--primary, #5e69eb);
+}
+
+.mailing-history-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 16px;
+}
+
+.profile-section .card-header {
+  font-size: 0.95rem;
+}
+
 /* ============ Buttons ============ */
 .btn {
   display: inline-flex;
@@ -2736,6 +2882,22 @@ tr:hover td {
 
   .nav-links {
     gap: 4px;
+  }
+
+  .nav-desktop-only {
+    display: none !important;
+  }
+
+  .account-dropdown-mobile-only {
+    display: block;
+  }
+
+  .account-chip {
+    max-width: 120px;
+  }
+
+  .mailing-history-grid {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-create-form {

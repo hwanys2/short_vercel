@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { isAdminEmail } from '@/lib/admin';
 import { resolveAppUser } from '@/lib/session';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { serializeUsernameChangeCooldown } from '@/lib/usernameChange';
 
 export async function GET() {
@@ -17,11 +19,29 @@ export async function GET() {
         id: null,
         username: null,
         email: user.email,
+        is_admin: false,
       },
     });
   }
 
   const cooldown = serializeUsernameChangeCooldown(user.username_changed_at);
+
+  let acceptsOptionalMail = true;
+  let hasPassword = false;
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: row } = await admin
+      .from('short_users')
+      .select('accepts_optional_mail, password')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (row) {
+      acceptsOptionalMail = row.accepts_optional_mail !== false;
+      hasPassword = Boolean(row.password);
+    }
+  } catch (err) {
+    console.error('auth/me profile fields:', err);
+  }
 
   return NextResponse.json({
     success: true,
@@ -30,6 +50,9 @@ export async function GET() {
       id: user.id,
       username: user.username,
       email: user.email,
+      is_admin: isAdminEmail(user.email),
+      accepts_optional_mail: acceptsOptionalMail,
+      has_password: hasPassword,
       username_changed_at: user.username_changed_at || null,
       can_change_username: cooldown.can_change,
       username_change_remaining_label: cooldown.remaining_label,

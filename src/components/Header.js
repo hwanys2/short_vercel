@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   THEME_PREFERENCES,
   applyResolvedTheme,
@@ -13,9 +13,18 @@ import {
 export default function Header() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [themePreference, setThemePreference] = useState(() => getStoredThemePreference());
-  const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
+  const [mounted, setMounted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const [themePreference, setThemePreference] = useState(THEME_PREFERENCES.SYSTEM);
+  const [systemTheme, setSystemTheme] = useState(THEME_PREFERENCES.LIGHT);
   const resolvedTheme = themePreference === THEME_PREFERENCES.SYSTEM ? systemTheme : themePreference;
+
+  useEffect(() => {
+    setMounted(true);
+    setThemePreference(getStoredThemePreference());
+    setSystemTheme(getSystemTheme());
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -45,8 +54,27 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     applyResolvedTheme(resolvedTheme);
-  }, [resolvedTheme]);
+  }, [mounted, resolvedTheme]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   const handleThemeChange = (nextPreference) => {
     setThemePreference(nextPreference);
@@ -55,6 +83,7 @@ export default function Header() {
   };
 
   const handleLogout = async () => {
+    setMenuOpen(false);
     await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
     window.location.href = '/';
@@ -75,6 +104,9 @@ export default function Header() {
             숏.한국
           </a>
           <nav className="nav-links">
+            <Link href="/guide" className="nav-text-link nav-desktop-only">
+              가이드
+            </Link>
             <div className="theme-switcher" role="group" aria-label="테마 선택">
               <button
                 type="button"
@@ -111,13 +143,77 @@ export default function Header() {
               <>
                 <Link
                   href={user.needsOnboarding ? '/onboarding' : '/dashboard'}
-                  className="btn btn-ghost"
+                  className="btn btn-ghost nav-desktop-only"
                 >
                   {user.needsOnboarding ? '본인코드 설정' : '대시보드'}
                 </Link>
-                <button onClick={handleLogout} className="btn btn-secondary btn-sm">
-                  로그아웃
-                </button>
+                <div className="account-menu" ref={menuRef}>
+                  <button
+                    type="button"
+                    className="account-chip"
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpen}
+                    onClick={() => setMenuOpen((v) => !v)}
+                  >
+                    <span className="account-chip-label">
+                      {user.needsOnboarding ? user.email || '계정' : user.username || '계정'}
+                    </span>
+                    <span className="account-chip-caret" aria-hidden="true">
+                      ▾
+                    </span>
+                  </button>
+                  {menuOpen && (
+                    <div className="account-dropdown" role="menu">
+                      {user.needsOnboarding ? (
+                        <Link
+                          href="/onboarding"
+                          className="account-dropdown-item"
+                          role="menuitem"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          본인코드 설정
+                        </Link>
+                      ) : (
+                        <>
+                          <Link
+                            href="/dashboard"
+                            className="account-dropdown-item account-dropdown-mobile-only"
+                            role="menuitem"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            대시보드
+                          </Link>
+                          <Link
+                            href="/profile"
+                            className="account-dropdown-item"
+                            role="menuitem"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            프로필
+                          </Link>
+                          {user.is_admin && (
+                            <Link
+                              href="/admin/mailing"
+                              className="account-dropdown-item"
+                              role="menuitem"
+                              onClick={() => setMenuOpen(false)}
+                            >
+                              메일 발송
+                            </Link>
+                          )}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        className="account-dropdown-item account-dropdown-danger"
+                        role="menuitem"
+                        onClick={handleLogout}
+                      >
+                        로그아웃
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <>

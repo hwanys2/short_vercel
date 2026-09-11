@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS short_users (
   token_version INTEGER NOT NULL DEFAULT 1,
   auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
   username_changed_at TIMESTAMPTZ,
+  accepts_optional_mail BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   last_login TIMESTAMPTZ
