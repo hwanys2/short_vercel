@@ -21,7 +21,10 @@ export default function Header() {
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) setUser(data.user);
+        if (data.success && !data.needsOnboarding) setUser(data.user);
+        else if (data.success && data.needsOnboarding) {
+          setUser({ email: data.user?.email, needsOnboarding: true });
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -106,8 +109,11 @@ export default function Header() {
             </div>
             {loading ? null : user ? (
               <>
-                <Link href="/dashboard" className="btn btn-ghost">
-                  대시보드
+                <Link
+                  href={user.needsOnboarding ? '/onboarding' : '/dashboard'}
+                  className="btn btn-ghost"
+                >
+                  {user.needsOnboarding ? '본인코드 설정' : '대시보드'}
                 </Link>
                 <button onClick={handleLogout} className="btn btn-secondary btn-sm">
                   로그아웃

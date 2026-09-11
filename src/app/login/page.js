@@ -1,15 +1,36 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
+import Turnstile from '@/components/Turnstile';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
-export default function LoginPage() {
+const ERROR_MESSAGES = {
+  auth_callback: '로그인에 실패했습니다. 다시 시도해주세요.',
+  auth_exchange: '인증 처리에 실패했습니다. 다시 시도해주세요.',
+  no_email: '이메일 정보를 가져올 수 없습니다.',
+  email_unverified: '이메일이 확인되지 않은 계정입니다.',
+  account_conflict:
+    '이 이메일은 이미 다른 계정에 연결되어 있습니다. 기존 방식으로 로그인해 주세요.',
+  link_failed: '계정 연동에 실패했습니다. 잠시 후 다시 시도해주세요.',
+};
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const err = searchParams.get('error');
+    if (err && ERROR_MESSAGES[err]) {
+      setError(ERROR_MESSAGES[err]);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,7 +41,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernameOrEmail, password }),
+        body: JSON.stringify({ usernameOrEmail, password, turnstileToken }),
       });
 
       const data = await res.json();
@@ -59,7 +80,9 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label className="form-label" htmlFor="login-email">이메일 또는 닉네임</label>
+                <label className="form-label" htmlFor="login-email">
+                  이메일 또는 닉네임
+                </label>
                 <input
                   id="login-email"
                   type="text"
@@ -97,15 +120,55 @@ export default function LoginPage() {
                   inputMode="latin"
                   spellCheck={false}
                 />
-                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                <small
+                  style={{
+                    color: 'var(--text-muted)',
+                    fontSize: '0.75rem',
+                    marginTop: '4px',
+                    display: 'block',
+                  }}
+                >
                   한글은 입력되지 않습니다.
                 </small>
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }} disabled={loading}>
-                {loading ? <><span className="spinner" /> 로그인 중...</> : '로그인'}
+              <Turnstile
+                onVerify={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken('')}
+              />
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '8px' }}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner" /> 로그인 중...
+                  </>
+                ) : (
+                  '로그인'
+                )}
               </button>
             </form>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                margin: '20px 0 8px',
+                color: 'var(--text-muted)',
+                fontSize: '0.85rem',
+              }}
+            >
+              <div style={{ flex: 1, height: 1, background: 'var(--border-color, #ddd)' }} />
+              또는
+              <div style={{ flex: 1, height: 1, background: 'var(--border-color, #ddd)' }} />
+            </div>
+
+            <GoogleSignInButton disabled={loading} />
 
             <div className="auth-option">
               계정이 없으신가요? <Link href="/register">회원가입</Link>
@@ -118,5 +181,23 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-page">
+          <div className="auth-card">
+            <div className="auth-body" style={{ textAlign: 'center' }}>
+              <span className="spinner" /> 로딩 중...
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

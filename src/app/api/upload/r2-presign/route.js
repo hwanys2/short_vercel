@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest } from '@/lib/auth';
+import { requireAppUser } from '@/lib/session';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { createR2PresignedUploadUrl, isR2Configured, configureR2BucketCors } from '@/lib/r2';
 import {
@@ -88,7 +88,7 @@ export async function POST(request) {
 
     // 사전 단축 코드 중복 검사 (신규 생성 시에만 검사, 수정(isEdit) 시에는 제외)
     if (!isEdit) {
-      const user = getUserFromRequest(request);
+      const user = await requireAppUser(request);
       const userId = user?.id || null;
       const supabase = getSupabaseAdmin();
 

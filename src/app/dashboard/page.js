@@ -94,6 +94,8 @@ export default function DashboardPage() {
       .then((data) => {
         if (!data.success) {
           router.push('/login');
+        } else if (data.needsOnboarding) {
+          router.push('/onboarding');
         } else {
           setUser(data.user);
         }

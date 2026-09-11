@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { isSocialCrawler } from '@/lib/isSocialCrawler';
+import { updateSession } from '@/lib/supabase/middleware';
 
 // 정적 페이지 경로 (이 경로들은 리다이렉트 처리하지 않음)
 // 단축 코드는 [가-힣a-zA-Z0-9_-]+ 만 허용 → 점(.)이 들어간 경로는 예약(리다이렉트 루프 방지)
@@ -13,6 +14,8 @@ const STATIC_PATHS = [
   '/login',
   '/register',
   '/dashboard',
+  '/onboarding',
+  '/auth',
   '/faq',
   '/guide',
   '/terms',
@@ -29,21 +32,42 @@ const STATIC_PATHS = [
   '/ads.txt',
 ];
 
-export function middleware(request) {
+/** Auth 세션 쿠키 갱신이 필요한 앱 경로 (단축 URL rewrite 제외) */
+function needsAuthRefresh(pathname) {
+  return (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/urls') ||
+    pathname.startsWith('/api/shorten') ||
+    pathname.startsWith('/api/check-code') ||
+    pathname.startsWith('/api/upload') ||
+    pathname === '/'
+  );
+}
+
+export async function middleware(request) {
   const rawPath = request.nextUrl.pathname;
   const pathname = rawPath.replace(/\/+$/, '') || '/';
 
-  // 루트 경로는 메인 페이지
+  // 루트 경로
   if (pathname === '/') {
-    return NextResponse.next();
+    return updateSession(request);
   }
 
-  // 정적 경로는 패스
+  // 앱 정적 경로: Auth 세션 갱신 후 통과
   if (STATIC_PATHS.some((p) => pathname.startsWith(p))) {
+    if (needsAuthRefresh(pathname)) {
+      return updateSession(request);
+    }
     return NextResponse.next();
   }
 
   // URL 세그먼트 추출 (퍼센트 인코딩·NFC 정규화 후 DB와 동일한 문자열로 조회)
+  // 단축 URL은 Auth 갱신 없이 rewrite만 — 링크 클릭 지연 방지
   const segments = pathname.split('/').filter(Boolean);
   const ua = request.headers.get('user-agent') || '';
   const socialBot = isSocialCrawler(ua);

@@ -3,11 +3,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
+import Turnstile from '@/components/Turnstile';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ username: '', email: '', password: '', password_confirm: '' });
+  const [form, setForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    password_confirm: '',
+  });
+  const [turnstileToken, setTurnstileToken] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -15,6 +24,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setInfo('');
 
     if (form.password !== form.password_confirm) {
       setError('비밀번호가 일치하지 않습니다.');
@@ -34,13 +44,20 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, turnstileToken }),
       });
       const data = await res.json();
 
       if (data.success) {
-        router.push('/');
-        router.refresh();
+        if (data.needsEmailConfirmation) {
+          setInfo(
+            data.message ||
+              '가입이 접수되었습니다. 이메일로 보낸 인증 링크를 클릭한 뒤 로그인해주세요.'
+          );
+        } else {
+          router.push('/');
+          router.refresh();
+        }
       } else {
         setError(data.message);
       }
@@ -69,100 +86,178 @@ export default function RegisterPage() {
           </div>
           <div className="auth-body">
             {error && <div className="alert alert-danger">⚠️ {error}</div>}
+            {info && <div className="alert alert-success">✉️ {info}</div>}
 
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-username">닉네임</label>
-                <input
-                  id="reg-username"
-                  type="text"
-                  className="form-input"
-                  value={form.username}
-                  onChange={(e) => update('username', e.target.value)}
-                  required
-                />
-                <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                  숏.한국/<strong>{form.username || '닉네임'}</strong>/단축코드 형태로 사용됩니다.
-                </small>
-              </div>
+            {!info && (
+              <>
+                <form onSubmit={handleSubmit}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="reg-username">
+                      닉네임
+                    </label>
+                    <input
+                      id="reg-username"
+                      type="text"
+                      className="form-input"
+                      value={form.username}
+                      onChange={(e) => update('username', e.target.value)}
+                      required
+                    />
+                    <small
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '0.8rem',
+                        marginTop: '4px',
+                        display: 'block',
+                      }}
+                    >
+                      숏.한국/<strong>{form.username || '닉네임'}</strong>/단축코드 형태로
+                      사용됩니다.
+                    </small>
+                  </div>
 
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-email">이메일</label>
-                <input
-                  id="reg-email"
-                  type="email"
-                  className="form-input"
-                  value={form.email}
-                  onChange={(e) => update('email', e.target.value)}
-                  required
-                />
-              </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="reg-email">
+                      이메일
+                    </label>
+                    <input
+                      id="reg-email"
+                      type="email"
+                      className="form-input"
+                      value={form.email}
+                      onChange={(e) => update('email', e.target.value)}
+                      required
+                    />
+                    <small
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '0.8rem',
+                        marginTop: '4px',
+                        display: 'block',
+                      }}
+                    >
+                      가입 후 이메일 인증이 필요합니다.
+                    </small>
+                  </div>
 
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-password">
-                  비밀번호
-                  <span
-                    style={{
-                      fontWeight: 400,
-                      fontSize: '0.75rem',
-                      color: 'var(--text-muted)',
-                      marginLeft: '8px',
-                    }}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="reg-password">
+                      비밀번호
+                      <span
+                        style={{
+                          fontWeight: 400,
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                          marginLeft: '8px',
+                        }}
+                      >
+                        (영문·숫자로 입력)
+                      </span>
+                    </label>
+                    <input
+                      id="reg-password"
+                      type="password"
+                      className="form-input"
+                      value={form.password}
+                      onChange={(e) => update('password', sanitizeAsciiPasswordInput(e.target.value))}
+                      required
+                      lang="en"
+                      inputMode="latin"
+                      spellCheck={false}
+                    />
+                    <small
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '0.8rem',
+                        marginTop: '4px',
+                        display: 'block',
+                      }}
+                    >
+                      ℹ️ 최소 8자, 영문·숫자·기호(반각)만 사용됩니다. 한글 입력은 자동으로
+                      제외됩니다.
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="reg-password-confirm">
+                      비밀번호 확인
+                      <span
+                        style={{
+                          fontWeight: 400,
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                          marginLeft: '8px',
+                        }}
+                      >
+                        (영문·숫자로 입력)
+                      </span>
+                    </label>
+                    <input
+                      id="reg-password-confirm"
+                      type="password"
+                      className="form-input"
+                      value={form.password_confirm}
+                      onChange={(e) =>
+                        update('password_confirm', sanitizeAsciiPasswordInput(e.target.value))
+                      }
+                      required
+                      lang="en"
+                      inputMode="latin"
+                      spellCheck={false}
+                    />
+                  </div>
+
+                  <Turnstile
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken('')}
+                  />
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ width: '100%', marginTop: '8px' }}
+                    disabled={loading}
                   >
-                    (영문·숫자로 입력)
-                  </span>
-                </label>
-                <input
-                  id="reg-password"
-                  type="password"
-                  className="form-input"
-                  value={form.password}
-                  onChange={(e) => update('password', sanitizeAsciiPasswordInput(e.target.value))}
-                  required
-                  lang="en"
-                  inputMode="latin"
-                  spellCheck={false}
-                />
-                <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                  ℹ️ 최소 8자, 영문·숫자·기호(반각)만 사용됩니다. 한글 입력은 자동으로 제외됩니다.
-                </small>
+                    {loading ? (
+                      <>
+                        <span className="spinner" /> 가입 중...
+                      </>
+                    ) : (
+                      '회원가입'
+                    )}
+                  </button>
+                </form>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    margin: '20px 0 8px',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <div style={{ flex: 1, height: 1, background: 'var(--border-color, #ddd)' }} />
+                  또는
+                  <div style={{ flex: 1, height: 1, background: 'var(--border-color, #ddd)' }} />
+                </div>
+
+                <GoogleSignInButton label="Google로 가입하기" disabled={loading} />
+              </>
+            )}
+
+            {info && (
+              <div className="auth-option" style={{ marginTop: '16px' }}>
+                <Link href="/login">로그인 페이지로</Link>
               </div>
+            )}
 
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-password-confirm">
-                  비밀번호 확인
-                  <span
-                    style={{
-                      fontWeight: 400,
-                      fontSize: '0.75rem',
-                      color: 'var(--text-muted)',
-                      marginLeft: '8px',
-                    }}
-                  >
-                    (영문·숫자로 입력)
-                  </span>
-                </label>
-                <input
-                  id="reg-password-confirm"
-                  type="password"
-                  className="form-input"
-                  value={form.password_confirm}
-                  onChange={(e) => update('password_confirm', sanitizeAsciiPasswordInput(e.target.value))}
-                  required
-                  lang="en"
-                  inputMode="latin"
-                  spellCheck={false}
-                />
+            {!info && (
+              <div className="auth-option">
+                이미 계정이 있으신가요? <Link href="/login">로그인</Link>
               </div>
-
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }} disabled={loading}>
-                {loading ? <><span className="spinner" /> 가입 중...</> : '회원가입'}
-              </button>
-            </form>
-
-            <div className="auth-option">
-              이미 계정이 있으신가요? <Link href="/login">로그인</Link>
-            </div>
+            )}
           </div>
         </div>
 

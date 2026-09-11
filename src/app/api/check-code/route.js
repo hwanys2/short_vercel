@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest } from '@/lib/auth';
+import { requireAppUser } from '@/lib/session';
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     const userId = user?.id || null;
 
     if (!code) {

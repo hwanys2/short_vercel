@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest } from '@/lib/auth';
+import { requireAppUser } from '@/lib/session';
 
 function decodeCodeParam(code) {
   try {
@@ -42,7 +42,7 @@ function addDaysKst(dateStr, days) {
 
 export async function GET(request, { params }) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     if (!user) {
       return NextResponse.json({ success: false, message: '로그인이 필요합니다.' }, { status: 401 });
     }

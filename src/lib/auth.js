@@ -26,6 +26,7 @@ export function createToken(user) {
       id: user.id,
       username: user.username,
       email: user.email,
+      tv: typeof user.token_version === 'number' ? user.token_version : 1,
     },
     JWT_SECRET,
     { expiresIn: '7d' }
@@ -79,6 +80,7 @@ export async function getCurrentUser() {
       id: decoded.id,
       username: decoded.username,
       email: decoded.email,
+      tv: decoded.tv ?? null,
     };
   } catch {
     return null;

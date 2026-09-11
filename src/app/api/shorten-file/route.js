@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest, hashPassword } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
+import { requireAppUser } from '@/lib/session';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
 import { isR2Key } from '@/lib/r2';
@@ -57,7 +58,7 @@ export async function POST(request) {
   let uploadedPath = null;
 
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     const userId = user?.id || null;
     const supabase = getSupabaseAdmin();
 

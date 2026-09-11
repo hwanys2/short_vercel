@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest } from '@/lib/auth';
+import { requireAppUser } from '@/lib/session';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
@@ -22,7 +22,7 @@ function escapeIlike(q) {
 // 내 URL 목록 가져오기
 export async function GET(request) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     if (!user) {
       return NextResponse.json({ success: false, message: '로그인이 필요합니다.' }, { status: 401 });
     }
@@ -163,7 +163,7 @@ export async function GET(request) {
 // 대시보드에서 URL 생성
 export async function POST(request) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     if (!user) {
       return NextResponse.json({ success: false, message: '로그인이 필요합니다.' }, { status: 401 });
     }

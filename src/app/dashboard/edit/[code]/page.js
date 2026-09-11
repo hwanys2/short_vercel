@@ -45,6 +45,8 @@ export default function EditUrlPage() {
       .then((data) => {
         if (!data.success) {
           router.replace('/login');
+        } else if (data.needsOnboarding) {
+          router.replace('/onboarding');
         } else {
           setUser(data.user);
         }

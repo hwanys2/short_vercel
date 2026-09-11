@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS short_users (
   legacy_id INTEGER UNIQUE,
   username VARCHAR(50) NOT NULL UNIQUE,
   email VARCHAR(100) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
+  password VARCHAR(255), -- NULL 허용: 구글 전용 계정 / Auth 전환 후
+  token_version INTEGER NOT NULL DEFAULT 1,
+  auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   last_login TIMESTAMPTZ
@@ -18,6 +20,8 @@ CREATE TABLE IF NOT EXISTS short_users (
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_short_users_email ON short_users(email);
 CREATE INDEX IF NOT EXISTS idx_short_users_username ON short_users(username);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_short_users_auth_user_id
+  ON short_users(auth_user_id) WHERE auth_user_id IS NOT NULL;
 
 -- 2. URL 테이블 생성
 CREATE TABLE IF NOT EXISTS short_urls (
@@ -186,5 +190,19 @@ ON CONFLICT (id) DO UPDATE SET
 -- (A) 비회원: expiration_date < NOW() → DB 삭제 (+ type=file 이면 Storage도 삭제)
 -- (B) 회원 파일 만료: expiration_date < NOW() 이고 file_path 있음 → R2만 삭제, 행 유지(file_path=null)
 -- (C) 회원 파일만: COALESCE(last_visit, created_at) < NOW() - 3 months → 링크·파일 삭제
+
+-- ============================================
+-- Supabase Auth 브릿지 (기존 DB에 적용 시)
+-- ============================================
+ALTER TABLE short_users
+  ADD COLUMN IF NOT EXISTS auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_short_users_auth_user_id
+  ON short_users(auth_user_id) WHERE auth_user_id IS NOT NULL;
+
+ALTER TABLE short_users ALTER COLUMN password DROP NOT NULL;
+
+ALTER TABLE short_users
+  ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1;
 
 SELECT 'Supabase 테이블 생성 완료!';

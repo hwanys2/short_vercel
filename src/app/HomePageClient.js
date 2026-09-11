@@ -39,7 +39,10 @@ export default function HomePageClient() {
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) setUser(data.user);
+        if (data.success && !data.needsOnboarding) setUser(data.user);
+        else if (data.success && data.needsOnboarding) {
+          setUser({ email: data.user?.email, needsOnboarding: true });
+        }
       })
       .catch(() => {});
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserFromRequest, hashPassword } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
+import { requireAppUser } from '@/lib/session';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { deleteShortFile } from '@/lib/shortFiles';
 import { isR2Key } from '@/lib/r2';
@@ -28,7 +29,7 @@ function decodeCodeParam(code) {
 
 export async function GET(request, { params }) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     if (!user) {
       return NextResponse.json({ success: false, message: '로그인이 필요합니다.' }, { status: 401 });
     }
@@ -60,7 +61,7 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     if (!user) {
       return NextResponse.json({ success: false, message: '로그인이 필요합니다.' }, { status: 401 });
     }
@@ -249,7 +250,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await requireAppUser(request);
     if (!user) {
       return NextResponse.json({ success: false, message: '로그인이 필요합니다.' }, { status: 401 });
     }
