@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resolveAppUser } from '@/lib/session';
+import { serializeUsernameChangeCooldown } from '@/lib/usernameChange';
 
 export async function GET() {
   const user = await resolveAppUser();
@@ -20,6 +21,8 @@ export async function GET() {
     });
   }
 
+  const cooldown = serializeUsernameChangeCooldown(user.username_changed_at);
+
   return NextResponse.json({
     success: true,
     needsOnboarding: false,
@@ -27,6 +30,10 @@ export async function GET() {
       id: user.id,
       username: user.username,
       email: user.email,
+      username_changed_at: user.username_changed_at || null,
+      can_change_username: cooldown.can_change,
+      username_change_remaining_label: cooldown.remaining_label,
+      username_change_next_at: cooldown.next_change_at,
     },
   });
 }

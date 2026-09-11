@@ -13,6 +13,7 @@ function shapeUser(row) {
     email: row.email,
     tv: row.token_version ?? null,
     auth_user_id: row.auth_user_id ?? null,
+    username_changed_at: row.username_changed_at ?? null,
   };
 }
 
@@ -45,7 +46,7 @@ export async function resolveAppUser(request = null) {
     if (!claimsError && authUserId) {
       const { data: row } = await admin
         .from('short_users')
-        .select('id, username, email, token_version, auth_user_id')
+        .select('id, username, email, token_version, auth_user_id, username_changed_at')
         .eq('auth_user_id', authUserId)
         .maybeSingle();
 
@@ -91,7 +92,7 @@ export async function resolveAppUser(request = null) {
 
     const { data: row } = await admin
       .from('short_users')
-      .select('id, username, email, token_version, auth_user_id')
+      .select('id, username, email, token_version, auth_user_id, username_changed_at')
       .eq('id', decoded.id)
       .maybeSingle();
 

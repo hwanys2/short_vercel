@@ -60,6 +60,7 @@ export default function GuidePage() {
             <li>기존 목록 확인</li>
             <li>각 링크의 클릭 통계 확인</li>
             <li>복사·수정·삭제</li>
+            <li>본인 코드 변경 (30일에 한 번. 바꾸면 기존 주소는 즉시 무효가 되고 이전 코드는 바로 해제됩니다)</li>
           </ul>
 
           <h2>6. QR 코드 활용</h2>

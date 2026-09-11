@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS short_users (
   password VARCHAR(255), -- NULL 허용: 구글 전용 계정 / Auth 전환 후
   token_version INTEGER NOT NULL DEFAULT 1,
   auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
+  username_changed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   last_login TIMESTAMPTZ
@@ -204,5 +205,8 @@ ALTER TABLE short_users ALTER COLUMN password DROP NOT NULL;
 
 ALTER TABLE short_users
   ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1;
+
+ALTER TABLE short_users
+  ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMPTZ;
 
 SELECT 'Supabase 테이블 생성 완료!';

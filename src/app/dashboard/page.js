@@ -13,6 +13,7 @@ import {
 } from '@/lib/shortFilesShared';
 import { uploadShortFileAuto } from '@/lib/fileUploadClient';
 import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
+import ChangeUsernameModal from '@/components/ChangeUsernameModal';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -80,6 +81,9 @@ export default function DashboardPage() {
   // 회원탈퇴 모달
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+
+  // 본인 코드 변경 모달
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
 
   // 비밀번호 변경 모달
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -765,6 +769,9 @@ export default function DashboardPage() {
           {/* Actions */}
           <div style={{ textAlign: 'center', marginTop: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowUsernameModal(true)}>
+                본인 코드 변경
+              </button>
               <button type="button" className="btn btn-secondary btn-sm" onClick={openPasswordModal}>
                 비밀번호 변경
               </button>
@@ -784,6 +791,20 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+
+          <ChangeUsernameModal
+            open={showUsernameModal}
+            user={user}
+            baseUrl={baseUrl}
+            onClose={() => setShowUsernameModal(false)}
+            onChanged={(data) => {
+              const nextUsername = data?.user?.username || '';
+              alert(
+                `본인 코드가 ${nextUsername}(으)로 변경되었습니다.\n기존 단축 주소는 즉시 무효가 되며, 이전 코드는 다른 사람이 사용할 수 있습니다.`
+              );
+              window.location.assign('/dashboard');
+            }}
+          />
 
           {/* 비밀번호 변경 모달 */}
           {showPasswordModal && (

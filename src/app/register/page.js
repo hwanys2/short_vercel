@@ -31,7 +31,7 @@ export default function RegisterPage() {
             >
               신규 가입은 <strong>Google 계정만</strong> 지원합니다.
               <br />
-              가입 직후 <strong>숏.한국/본인코드/단축코드</strong>에 쓸 닉네임을 직접 정합니다.
+              가입 직후 <strong>숏.한국/본인코드/단축코드</strong>에 쓸 닉네임을 직접 정합니다. 이후 대시보드에서 30일에 한 번 변경할 수 있습니다.
             </p>
 
             <GoogleSignInButton label="Google로 가입하기" intent="signup" />

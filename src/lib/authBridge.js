@@ -37,8 +37,21 @@ export function normalizeEmail(email) {
     .trim();
 }
 
+export function normalizeUsernameInput(username) {
+  const trimmed = String(username || '').trim();
+  try {
+    return trimmed.normalize('NFC');
+  } catch {
+    return trimmed;
+  }
+}
+
+export function usernamesEqual(a, b) {
+  return normalizeUsernameInput(a) === normalizeUsernameInput(b);
+}
+
 export function validateUsername(username) {
-  const clean = String(username || '').trim();
+  const clean = normalizeUsernameInput(username);
   if (!clean) {
     return { ok: false, message: '닉네임을 입력해주세요.' };
   }

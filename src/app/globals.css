@@ -2472,6 +2472,10 @@ tr:hover td {
   animation: modalSlideUp 0.3s ease;
 }
 
+.modal-wide {
+  max-width: 560px;
+}
+
 @keyframes modalSlideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }

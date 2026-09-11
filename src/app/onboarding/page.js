@@ -13,6 +13,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [availability, setAvailability] = useState(null);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -31,6 +32,21 @@ export default function OnboardingPage() {
       .catch(() => router.replace('/login'))
       .finally(() => setChecking(false));
   }, [router]);
+
+  useEffect(() => {
+    const trimmed = username.trim();
+    if (!trimmed) {
+      setAvailability(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      fetch(`/api/auth/check-username?username=${encodeURIComponent(trimmed)}`)
+        .then((res) => res.json())
+        .then((data) => setAvailability(data))
+        .catch(() => setAvailability(null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [username]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,6 +129,17 @@ export default function OnboardingPage() {
                   autoFocus
                   maxLength={50}
                 />
+                {availability?.message && (
+                  <p
+                    style={{
+                      margin: '6px 0 0',
+                      fontSize: '0.8rem',
+                      color: availability.available ? '#047857' : 'var(--danger)',
+                    }}
+                  >
+                    {availability.available ? '사용 가능한 본인 코드입니다.' : availability.message}
+                  </p>
+                )}
                 <small
                   style={{
                     color: 'var(--text-muted)',
@@ -121,7 +148,7 @@ export default function OnboardingPage() {
                     display: 'block',
                   }}
                 >
-                  숏.한국/<strong>{username || '닉네임'}</strong>/단축코드 — 가입 후 변경이 어렵습니다.
+                  숏.한국/<strong>{username || '닉네임'}</strong>/단축코드 — 대시보드에서 30일에 한 번 변경할 수 있습니다. 바꾸면 기존 주소는 모두 바뀌고, 이전 코드는 즉시 해제됩니다.
                 </small>
               </div>
 
@@ -129,7 +156,7 @@ export default function OnboardingPage() {
                 type="submit"
                 className="btn btn-primary"
                 style={{ width: '100%', marginTop: '8px' }}
-                disabled={loading}
+                disabled={loading || (availability && availability.success && availability.available === false)}
               >
                 {loading ? (
                   <>
