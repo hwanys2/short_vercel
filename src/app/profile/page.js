@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -152,13 +153,15 @@ export default function ProfilePage() {
     }
   };
 
+  const avatarLetter = (user?.username || user?.email || '?').charAt(0).toUpperCase();
+
   if (loading || !user) {
     return (
       <>
         <Header />
-        <main>
-          <div className="container" style={{ padding: '48px 24px', textAlign: 'center' }}>
-            <p style={{ color: 'var(--text-muted)' }}>불러오는 중...</p>
+        <main className="profile-page">
+          <div className="container-narrow profile-shell">
+            <p className="profile-loading">불러오는 중...</p>
           </div>
         </main>
         <Footer />
@@ -169,170 +172,205 @@ export default function ProfilePage() {
   return (
     <>
       <Header />
-      <main>
-        <div className="container-narrow" style={{ padding: '32px 24px 64px' }}>
-          <div style={{ marginBottom: 24 }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 6 }}>프로필</h1>
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              계정 정보, 비밀번호, 메일 수신 설정을 관리합니다.
-            </p>
+      <main className="profile-page">
+        <div className="container-narrow profile-shell">
+          <div className="profile-top">
+            <Link href="/dashboard" className="profile-back">
+              ← 대시보드
+            </Link>
+            <div className="profile-identity">
+              <div className="profile-avatar" aria-hidden="true">
+                {avatarLetter}
+              </div>
+              <div className="profile-identity-text">
+                <h1>프로필</h1>
+                <p>
+                  <span className="profile-identity-name">{user.username || '코드 없음'}</span>
+                  <span className="profile-identity-sep" aria-hidden="true">
+                    ·
+                  </span>
+                  <span>{user.email}</span>
+                </p>
+              </div>
+            </div>
           </div>
 
           {message && (
             <div
-              className={`alert ${messageType === 'danger' ? 'alert-danger' : 'alert-success'}`}
-              style={{ marginBottom: 16 }}
+              className={`alert ${messageType === 'danger' ? 'alert-danger' : 'alert-success'} profile-flash`}
             >
               {message}
             </div>
           )}
 
-          <section className="card profile-section">
-            <div className="card-header">계정</div>
-            <div className="card-body" style={{ display: 'grid', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">이메일</label>
-                <input className="form-input" value={user.email || ''} disabled readOnly />
+          <div className="profile-stack">
+            <section className="card profile-panel">
+              <div className="profile-panel-head">
+                <h2>계정</h2>
+                <p>로그인에 쓰는 기본 정보입니다.</p>
               </div>
-              <div className="form-group">
-                <label className="form-label">본인 코드</label>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="profile-panel-body">
+                <div className="profile-field">
+                  <label className="profile-label" htmlFor="profile-email">
+                    이메일
+                  </label>
                   <input
+                    id="profile-email"
                     className="form-input"
-                    value={user.username || ''}
+                    value={user.email || ''}
                     disabled
                     readOnly
-                    style={{ flex: 1, minWidth: 160 }}
                   />
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setShowUsernameModal(true)}
-                  >
-                    변경
-                  </button>
                 </div>
-                {!user.can_change_username && user.username_change_remaining_label && (
-                  <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    다음 변경까지 {user.username_change_remaining_label}
-                  </p>
-                )}
+                <div className="profile-field">
+                  <div className="profile-label-row">
+                    <label className="profile-label" htmlFor="profile-username">
+                      본인 코드
+                    </label>
+                    {!user.can_change_username && user.username_change_remaining_label && (
+                      <span className="profile-hint">
+                        다음 변경까지 {user.username_change_remaining_label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="profile-inline">
+                    <input
+                      id="profile-username"
+                      className="form-input"
+                      value={user.username || ''}
+                      disabled
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowUsernameModal(true)}
+                    >
+                      변경
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="card profile-section" style={{ marginTop: 16 }}>
-            <div className="card-header">보안</div>
-            <div className="card-body">
-              {!user.has_password && (
-                <div className="alert alert-info" style={{ marginBottom: 16, fontSize: '0.9rem' }}>
-                  구글 로그인 계정입니다. 비밀번호를 설정하면 이메일로도 로그인할 수 있습니다. 현재
-                  비밀번호가 없다면 구글 로그인 후 Auth에서 비밀번호를 먼저 연결해야 할 수 있습니다.
-                </div>
-              )}
-              <form onSubmit={handleChangePassword} style={{ display: 'grid', gap: 14 }}>
-                {passwordError && (
-                  <div className="alert alert-danger" style={{ marginBottom: 0 }}>
-                    {passwordError}
+            <section className="card profile-panel">
+              <div className="profile-panel-head">
+                <h2>보안</h2>
+                <p>비밀번호를 바꾸고 계정을 보호합니다.</p>
+              </div>
+              <div className="profile-panel-body">
+                {!user.has_password && (
+                  <div className="alert alert-info profile-inline-alert">
+                    구글 로그인 계정입니다. 비밀번호를 설정하면 이메일로도 로그인할 수 있습니다.
                   </div>
                 )}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="profile-current-password">
-                    현재 비밀번호
-                  </label>
-                  <input
-                    id="profile-current-password"
-                    type="password"
-                    className="form-input"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(sanitizeAsciiPasswordInput(e.target.value))}
-                    autoComplete="current-password"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="profile-new-password">
-                    새 비밀번호
-                  </label>
-                  <input
-                    id="profile-new-password"
-                    type="password"
-                    className="form-input"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(sanitizeAsciiPasswordInput(e.target.value))}
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                  <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    8자 이상
-                  </p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="profile-new-password-confirm">
-                    새 비밀번호 확인
-                  </label>
-                  <input
-                    id="profile-new-password-confirm"
-                    type="password"
-                    className="form-input"
-                    value={newPasswordConfirm}
-                    onChange={(e) =>
-                      setNewPasswordConfirm(sanitizeAsciiPasswordInput(e.target.value))
-                    }
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                </div>
-                <div>
-                  <button type="submit" className="btn btn-primary" disabled={passwordSaving}>
-                    {passwordSaving ? '변경 중...' : '비밀번호 변경'}
+                <form onSubmit={handleChangePassword} className="profile-form">
+                  {passwordError && (
+                    <div className="alert alert-danger profile-inline-alert">{passwordError}</div>
+                  )}
+                  <div className="profile-field">
+                    <label className="profile-label" htmlFor="profile-current-password">
+                      현재 비밀번호
+                    </label>
+                    <input
+                      id="profile-current-password"
+                      type="password"
+                      className="form-input"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(sanitizeAsciiPasswordInput(e.target.value))}
+                      autoComplete="current-password"
+                      required
+                    />
+                  </div>
+                  <div className="profile-field-pair">
+                    <div className="profile-field">
+                      <label className="profile-label" htmlFor="profile-new-password">
+                        새 비밀번호
+                      </label>
+                      <input
+                        id="profile-new-password"
+                        type="password"
+                        className="form-input"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(sanitizeAsciiPasswordInput(e.target.value))}
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                      />
+                      <p className="profile-hint">8자 이상</p>
+                    </div>
+                    <div className="profile-field">
+                      <label className="profile-label" htmlFor="profile-new-password-confirm">
+                        새 비밀번호 확인
+                      </label>
+                      <input
+                        id="profile-new-password-confirm"
+                        type="password"
+                        className="form-input"
+                        value={newPasswordConfirm}
+                        onChange={(e) =>
+                          setNewPasswordConfirm(sanitizeAsciiPasswordInput(e.target.value))
+                        }
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="profile-actions">
+                    <button type="submit" className="btn btn-primary" disabled={passwordSaving}>
+                      {passwordSaving ? '변경 중...' : '비밀번호 변경'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            <section className="card profile-panel">
+              <div className="profile-panel-head">
+                <h2>이메일 수신</h2>
+                <p>어떤 메일을 받을지 선택합니다.</p>
+              </div>
+              <div className="profile-panel-body profile-panel-body--flush">
+                <div className="profile-pref">
+                  <div className="profile-pref-copy">
+                    <div className="profile-pref-title">필수 안내</div>
+                    <p>서비스 운영·보안·약관 변경 안내는 해제할 수 없습니다.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="profile-switch is-on is-locked"
+                    aria-pressed="true"
+                    aria-label="필수 안내 (해제 불가)"
+                    disabled
+                  >
+                    <span className="profile-switch-thumb" />
                   </button>
                 </div>
-              </form>
-            </div>
-          </section>
-
-          <section className="card profile-section" style={{ marginTop: 16 }}>
-            <div className="card-header">이메일 수신</div>
-            <div className="card-body" style={{ display: 'grid', gap: 16 }}>
-              <label className="mail-consent-row">
-                <div>
-                  <div className="mail-consent-title">필수 안내</div>
-                  <p className="mail-consent-desc">
-                    서비스 운영·보안·약관 변경 안내는 해제할 수 없습니다.
-                  </p>
+                <div className="profile-pref">
+                  <div className="profile-pref-copy">
+                    <div className="profile-pref-title">메일 수신 동의</div>
+                    <p>기능 소식, 업데이트, 선택 안내 메일을 받습니다.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`profile-switch${optionalMail ? ' is-on' : ''}`}
+                    aria-pressed={optionalMail}
+                    aria-label="메일 수신 동의"
+                    disabled={mailSaving}
+                    onClick={() => handleMailToggle(!optionalMail)}
+                  >
+                    <span className="profile-switch-thumb" />
+                  </button>
                 </div>
-                <input type="checkbox" checked disabled readOnly aria-label="필수 안내 (해제 불가)" />
-              </label>
+              </div>
+            </section>
 
-              <label className="mail-consent-row">
-                <div>
-                  <div className="mail-consent-title">메일 수신 동의</div>
-                  <p className="mail-consent-desc">
-                    기능 소식, 업데이트, 선택 안내 메일을 받습니다. 언제든지 끌 수 있습니다.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={optionalMail}
-                  disabled={mailSaving}
-                  onChange={(e) => handleMailToggle(e.target.checked)}
-                  aria-label="메일 수신 동의"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="card profile-section" style={{ marginTop: 16 }}>
-            <div className="card-header" style={{ color: 'var(--danger)' }}>
-              위험 구역
-            </div>
-            <div className="card-body">
-              <p style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                회원탈퇴 시 모든 단축 URL이 영구 삭제되며 복구할 수 없습니다.
-              </p>
+            <section className="profile-danger">
+              <div className="profile-danger-copy">
+                <h2>회원탈퇴</h2>
+                <p>탈퇴 시 모든 단축 URL이 영구 삭제되며 복구할 수 없습니다.</p>
+              </div>
               <button
                 type="button"
                 className="btn btn-danger btn-sm"
@@ -340,8 +378,8 @@ export default function ProfilePage() {
               >
                 회원탈퇴
               </button>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
       </main>
       <Footer />
