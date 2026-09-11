@@ -14,6 +14,8 @@ const ERROR_MESSAGES = {
   account_conflict:
     '이 이메일은 이미 다른 계정에 연결되어 있습니다. 기존 방식으로 로그인해 주세요.',
   link_failed: '계정 연동에 실패했습니다. 잠시 후 다시 시도해주세요.',
+  already_registered:
+    '이미 가입된 이메일입니다. 아래 로그인(비밀번호 또는 Google)으로 들어와 주세요.',
 };
 
 function LoginForm() {

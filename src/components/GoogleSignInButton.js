@@ -3,13 +3,20 @@
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 /**
- * 구글 OAuth 로그인 버튼
+ * 구글 OAuth 버튼
+ * @param {'login'|'signup'} intent
+ *   - login: 기존 이메일 계정이 있으면 연동 후 대시보드
+ *   - signup: 신규만 허용. 이미 이메일이 있으면 로그인으로 안내
  */
-export default function GoogleSignInButton({ label = 'Google로 계속하기', disabled = false }) {
+export default function GoogleSignInButton({
+  label = 'Google로 계속하기',
+  disabled = false,
+  intent = 'login',
+}) {
   const handleClick = async () => {
     try {
       const supabase = createSupabaseBrowserClient();
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${window.location.origin}/auth/callback?intent=${encodeURIComponent(intent)}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -38,7 +45,7 @@ export default function GoogleSignInButton({ label = 'Google로 계속하기', d
       disabled={disabled}
       style={{
         width: '100%',
-        marginTop: '12px',
+        marginTop: intent === 'signup' ? '0' : '12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

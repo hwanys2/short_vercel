@@ -19,7 +19,8 @@ export default function PrivacyPage() {
 
           <h2>1. 수집하는 개인정보</h2>
           <ul>
-            <li><strong>회원가입 시:</strong> 닉네임, 이메일, 비밀번호(암호화 저장)</li>
+            <li><strong>회원가입 시:</strong> Google 계정 이메일, 본인코드(닉네임)</li>
+            <li><strong>기존 회원(이메일 가입):</strong> 닉네임, 이메일, 비밀번호(암호화 저장, 전환 기간 유지)</li>
             <li><strong>서비스 이용 시:</strong> URL 접속 기록, 방문 횟수</li>
             <li><strong>파일 공유 시:</strong> 업로드한 파일(문서·이미지·압축파일 등, 최대 5GB) 및 파일명·크기 메타데이터</li>
           </ul>
