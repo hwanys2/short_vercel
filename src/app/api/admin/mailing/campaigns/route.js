@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import {
+  VALID_AUDIENCES,
   createCampaign,
   listCampaigns,
   mapCampaignToApi,
@@ -41,11 +42,17 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const audience = body.audience === 'optional' ? 'optional' : body.audience === 'system' ? 'system' : null;
+    const audience = VALID_AUDIENCES.includes(body.audience) ? body.audience : null;
     const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
     const message = typeof body.message === 'string' ? body.message : '';
+    const messageText = message
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    if (!audience || !subject || !message.trim()) {
+    if (!audience || !subject || (!messageText && !/<img\b/i.test(message))) {
       return NextResponse.json(
         { success: false, error: 'audience, subject, message는 필수입니다.' },
         { status: 400 }

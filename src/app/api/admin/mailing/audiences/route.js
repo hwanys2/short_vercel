@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/admin';
+import { ADMIN_EMAILS, requireAdmin } from '@/lib/admin';
 import { AUDIENCE_LABELS } from '@/lib/mailing/campaign';
 import { countAudienceMembers } from '@/lib/mailing/recipients';
 
@@ -9,14 +9,23 @@ export async function GET(request) {
   const { admin } = auth;
 
   try {
-    const [systemCount, optionalCount] = await Promise.all([
+    const [systemCount, optionalCount, adminCount] = await Promise.all([
       countAudienceMembers(admin, 'system'),
       countAudienceMembers(admin, 'optional'),
+      countAudienceMembers(admin, 'admin'),
     ]);
+
+    const adminEmailList = Array.from(ADMIN_EMAILS).join(', ');
 
     return NextResponse.json({
       success: true,
       audiences: [
+        {
+          id: 'admin',
+          name: AUDIENCE_LABELS.admin,
+          memberCount: adminCount,
+          description: `${adminEmailList} 에게만 테스트 발송합니다.`,
+        },
         {
           id: 'system',
           name: AUDIENCE_LABELS.system,

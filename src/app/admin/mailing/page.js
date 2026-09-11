@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import RichTextEditor from '@/components/RichTextEditor';
 
 const ACTIVE_STATUSES = new Set(['preparing', 'queued', 'running']);
 
@@ -22,6 +23,17 @@ const STATUS_LABELS = {
 function formatDateTime(iso) {
   if (!iso) return '-';
   return new Date(iso).toLocaleString('ko-KR');
+}
+
+function htmlHasContent(html) {
+  const raw = String(html || '');
+  if (/<img\b/i.test(raw)) return true;
+  return raw
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim().length > 0;
 }
 
 async function mailingFetch(url, options = {}) {
@@ -88,7 +100,12 @@ export default function AdminMailingPage() {
     setAudiencesError(null);
     try {
       const result = await mailingFetch('/api/admin/mailing/audiences');
-      setAudiences(result.audiences || []);
+      const list = result.audiences || [];
+      setAudiences(list);
+      setSelectedAudience((current) => {
+        if (current && list.some((a) => a.id === current)) return current;
+        return list.some((a) => a.id === 'admin') ? 'admin' : current;
+      });
     } catch (err) {
       setAudiences([]);
       setAudiencesError(err.message);
@@ -172,7 +189,7 @@ export default function AdminMailingPage() {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!selectedAudience || !subject.trim() || !content.trim()) {
+    if (!selectedAudience || !subject.trim() || !htmlHasContent(content)) {
       setStatusMsg({ type: 'error', text: '모든 입력란을 채워주세요.' });
       return;
     }
@@ -289,7 +306,7 @@ export default function AdminMailingPage() {
     <>
       <Header />
       <main>
-        <div className="container mailing-admin" style={{ padding: '32px 24px 64px', maxWidth: 960 }}>
+        <div className="container mailing-admin" style={{ padding: '32px 24px 64px', maxWidth: 1040 }}>
           <div style={{ marginBottom: 24 }}>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 6 }}>단체 메일 발송</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
@@ -383,51 +400,18 @@ export default function AdminMailingPage() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="content">
-                      메일 본문
-                    </label>
+                    <label className="form-label">메일 본문</label>
                     <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      일반 텍스트 또는 HTML을 입력할 수 있습니다. 발송 시 숏.한국 헤더·푸터·수신거부
+                      시각 편집과 HTML을 함께 사용할 수 있습니다. 발송 시 숏.한국 헤더·푸터·수신거부
                       링크가 자동으로 붙습니다.
                     </p>
-                    <textarea
-                      id="content"
-                      className="form-input"
-                      rows={12}
+                    <RichTextEditor
                       value={content}
-                      onChange={(e) => setContent(e.target.value)}
+                      onChange={setContent}
                       disabled={isSubmitting}
                       placeholder="메일 본문을 작성하세요."
-                      required
-                      style={{ resize: 'vertical', fontFamily: 'inherit' }}
                     />
                   </div>
-
-                  {content.trim() && (
-                    <div>
-                      <p className="form-label">미리보기 (본문만)</p>
-                      <div
-                        className="mailing-preview"
-                        style={{
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: 16,
-                          background: 'var(--surface)',
-                          fontSize: '0.9rem',
-                          lineHeight: 1.6,
-                        }}
-                        dangerouslySetInnerHTML={{
-                          __html: /<[a-z][\s\S]*>/i.test(content)
-                            ? content
-                            : content
-                                .replace(/&/g, '&amp;')
-                                .replace(/</g, '&lt;')
-                                .replace(/>/g, '&gt;')
-                                .replace(/\n/g, '<br>'),
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
                 <div
                   className="card-header"
@@ -442,7 +426,11 @@ export default function AdminMailingPage() {
                     className="btn btn-primary"
                     disabled={isSubmitting || loadingAudiences || selectedMemberCount === 0}
                   >
-                    {isSubmitting ? '발송 준비 중...' : '백그라운드 발송 시작'}
+                    {isSubmitting
+                      ? '발송 준비 중...'
+                      : selectedAudience === 'admin'
+                        ? '테스트 발송 시작'
+                        : '백그라운드 발송 시작'}
                   </button>
                 </div>
               </form>

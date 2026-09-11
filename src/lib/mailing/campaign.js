@@ -7,9 +7,12 @@ export const STALE_SENDING_MS = 5 * 60 * 1000;
 const RECIPIENT_COUNT_STATUSES = ['sent', 'failed', 'skipped', 'pending', 'sending'];
 const ACTIVE_CAMPAIGN_STATUSES = new Set(['preparing', 'queued', 'running']);
 
+export const VALID_AUDIENCES = ['system', 'optional', 'admin'];
+
 export const AUDIENCE_LABELS = {
   system: '필수안내',
   optional: '메일수신동의',
+  admin: '관리자 (테스트)',
 };
 
 export function nowIso() {
@@ -61,7 +64,7 @@ export async function getCampaign(admin, campaignId) {
 }
 
 export const NO_RECIPIENTS_MESSAGE =
-  '발송 대상 수신자가 없습니다. 수신 대상(필수안내/메일수신동의)을 확인하세요.';
+  '발송 대상 수신자가 없습니다. 수신 대상(필수안내/메일수신동의/관리자 테스트)을 확인하세요.';
 
 export async function repairStuckCampaign(admin, campaign) {
   if (!campaign) return campaign;

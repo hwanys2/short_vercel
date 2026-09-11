@@ -10,7 +10,7 @@ CREATE INDEX IF NOT EXISTS idx_short_users_optional_mail
 CREATE TABLE IF NOT EXISTS mailing_campaigns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by BIGINT NOT NULL REFERENCES short_users(id) ON DELETE CASCADE,
-  audience TEXT NOT NULL CHECK (audience IN ('system', 'optional')),
+  audience TEXT NOT NULL CHECK (audience IN ('system', 'optional', 'admin')),
   subject TEXT NOT NULL,
   message TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'draft' CHECK (
@@ -65,3 +65,7 @@ REVOKE ALL ON TABLE mailing_campaigns FROM anon, authenticated;
 REVOKE ALL ON TABLE mailing_recipients FROM anon, authenticated;
 GRANT ALL ON TABLE mailing_campaigns TO service_role;
 GRANT ALL ON TABLE mailing_recipients TO service_role;
+
+ALTER TABLE mailing_campaigns DROP CONSTRAINT IF EXISTS mailing_campaigns_audience_check;
+ALTER TABLE mailing_campaigns ADD CONSTRAINT mailing_campaigns_audience_check
+  CHECK (audience IN ('system', 'optional', 'admin'));

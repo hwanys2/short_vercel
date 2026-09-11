@@ -1,10 +1,14 @@
+import { ADMIN_EMAILS, isAdminEmail } from '@/lib/admin';
+
 const PAGE_SIZE = 500;
 const INSERT_BATCH_SIZE = 500;
+const ADMIN_EMAIL_LIST = Array.from(ADMIN_EMAILS);
 
 /**
- * audience: 'system' | 'optional'
+ * audience: 'system' | 'optional' | 'admin'
  * system → 이메일 있는 전원
  * optional → accepts_optional_mail = true
+ * admin → 관리자 이메일(테스트 발송)
  */
 export async function collectAllRecipients(admin, { audience }) {
   const allUsers = [];
@@ -23,6 +27,8 @@ export async function collectAllRecipients(admin, { audience }) {
 
     if (audience === 'optional') {
       query = query.eq('accepts_optional_mail', true);
+    } else if (audience === 'admin') {
+      query = query.in('email', ADMIN_EMAIL_LIST);
     }
 
     const { data: rows, error } = await query;
@@ -34,6 +40,7 @@ export async function collectAllRecipients(admin, { audience }) {
         .trim()
         .toLowerCase();
       if (!email || seenEmails.has(email)) continue;
+      if (audience === 'admin' && !isAdminEmail(email)) continue;
       seenEmails.add(email);
       allUsers.push({ user_id: u.id, email });
     }
@@ -56,6 +63,10 @@ export async function isRecipientEligible(admin, { userId, audience }) {
   if (error || !user?.email) return false;
 
   if (audience === 'optional' && user.accepts_optional_mail === false) {
+    return false;
+  }
+
+  if (audience === 'admin' && !isAdminEmail(user.email)) {
     return false;
   }
 
@@ -87,6 +98,8 @@ export async function countAudienceMembers(admin, audience) {
 
   if (audience === 'optional') {
     query = query.eq('accepts_optional_mail', true);
+  } else if (audience === 'admin') {
+    query = query.in('email', ADMIN_EMAIL_LIST);
   }
 
   const { count, error } = await query;
