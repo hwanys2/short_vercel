@@ -278,7 +278,7 @@ export default function Header() {
                     <span className="account-avatar" aria-hidden="true">
                       {accountInitial}
                     </span>
-                    <span className="account-chip-label">{accountLabel}</span>{' '}
+                    <span className="account-chip-label">{accountLabel}</span>
                     <IconChevron open={menuOpen} />
                   </button>
                   {menuOpen && (
