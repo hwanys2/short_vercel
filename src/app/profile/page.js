@@ -467,6 +467,40 @@ export default function ProfilePage() {
               </div>
             </section>
 
+            {user?.is_admin && (
+              <section className="card profile-panel">
+                <div className="profile-panel-head">
+                  <h2>관리자 메뉴</h2>
+                  <p>관리자 전용 기능입니다.</p>
+                </div>
+                <div className="profile-panel-body">
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>단체 메일 발송</div>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        회원 대상 공지 및 업데이트 메일을 작성하고 발송합니다.
+                      </p>
+                    </div>
+                    <Link
+                      href="/admin/mailing"
+                      className="btn btn-secondary btn-sm"
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      메일 발송 관리 →
+                    </Link>
+                  </div>
+                </div>
+              </section>
+            )}
+
             <section className="profile-danger">
               <div className="profile-danger-copy">
                 <h2>회원탈퇴</h2>

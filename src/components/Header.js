@@ -148,7 +148,7 @@ export default function Header() {
       .then((data) => {
         if (data.success && !data.needsOnboarding) setUser(data.user);
         else if (data.success && data.needsOnboarding) {
-          setUser({ email: data.user?.email, needsOnboarding: true });
+          setUser({ ...data.user, needsOnboarding: true });
         }
       })
       .catch(() => {})
@@ -261,6 +261,14 @@ export default function Header() {
             </div>
             {loading ? null : user ? (
               <>
+                {user.is_admin && (
+                  <Link
+                    href="/admin/mailing"
+                    className="nav-text-link nav-desktop-only"
+                  >
+                    메일 발송
+                  </Link>
+                )}
                 <Link
                   href={user.needsOnboarding ? '/onboarding' : '/dashboard'}
                   className="nav-text-link nav-desktop-only"
@@ -284,17 +292,32 @@ export default function Header() {
                   {menuOpen && (
                     <div className="account-dropdown" role="menu">
                       {user.needsOnboarding ? (
-                        <Link
-                          href="/onboarding"
-                          className="account-dropdown-item"
-                          role="menuitem"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <MenuItemIcon>
-                            <IconKey />
-                          </MenuItemIcon>
-                          본인코드 설정
-                        </Link>
+                        <>
+                          <Link
+                            href="/onboarding"
+                            className="account-dropdown-item"
+                            role="menuitem"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            <MenuItemIcon>
+                              <IconKey />
+                            </MenuItemIcon>
+                            본인코드 설정
+                          </Link>
+                          {user.is_admin && (
+                            <Link
+                              href="/admin/mailing"
+                              className="account-dropdown-item"
+                              role="menuitem"
+                              onClick={() => setMenuOpen(false)}
+                            >
+                              <MenuItemIcon>
+                                <IconMail />
+                              </MenuItemIcon>
+                              메일 발송
+                            </Link>
+                          )}
+                        </>
                       ) : (
                         <>
                           <Link

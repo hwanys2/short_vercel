@@ -3,8 +3,17 @@ import { normalizeEmail } from '@/lib/authBridge';
 import { requireAppUser } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+const envAdmins = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((e) => normalizeEmail(e))
+  .filter(Boolean);
+
 /** 앱 관리자 이메일 allowlist (역할 컬럼 없음) */
-export const ADMIN_EMAILS = new Set(['hwanys2@naver.com']);
+export const ADMIN_EMAILS = new Set([
+  'hwanys2@naver.com',
+  'hwanys2na@gmail.com',
+  ...envAdmins,
+]);
 
 export function isAdminEmail(email) {
   const clean = normalizeEmail(email);

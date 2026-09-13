@@ -20,7 +20,7 @@ export async function GET() {
         id: null,
         username: null,
         email: user.email,
-        is_admin: false,
+        is_admin: isAdminEmail(user.email),
         codes: [],
         max_codes: MAX_CODES_DEFAULT,
         can_add_code: false,
