@@ -262,12 +262,20 @@ export default function Header() {
             {loading ? null : user ? (
               <>
                 {user.is_admin && (
-                  <Link
-                    href="/admin/mailing"
-                    className="nav-text-link nav-desktop-only"
-                  >
-                    메일 발송
-                  </Link>
+                  <>
+                    <Link
+                      href="/admin/slots"
+                      className="nav-text-link nav-desktop-only"
+                    >
+                      슬롯 관리
+                    </Link>
+                    <Link
+                      href="/admin/mailing"
+                      className="nav-text-link nav-desktop-only"
+                    >
+                      메일 발송
+                    </Link>
+                  </>
                 )}
                 <Link
                   href={user.needsOnboarding ? '/onboarding' : '/dashboard'}
@@ -305,17 +313,30 @@ export default function Header() {
                             본인코드 설정
                           </Link>
                           {user.is_admin && (
-                            <Link
-                              href="/admin/mailing"
-                              className="account-dropdown-item"
-                              role="menuitem"
-                              onClick={() => setMenuOpen(false)}
-                            >
-                              <MenuItemIcon>
-                                <IconMail />
-                              </MenuItemIcon>
-                              메일 발송
-                            </Link>
+                            <>
+                              <Link
+                                href="/admin/slots"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconKey />
+                                </MenuItemIcon>
+                                코드 슬롯 관리
+                              </Link>
+                              <Link
+                                href="/admin/mailing"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconMail />
+                                </MenuItemIcon>
+                                메일 발송
+                              </Link>
+                            </>
                           )}
                         </>
                       ) : (
@@ -343,17 +364,30 @@ export default function Header() {
                             프로필
                           </Link>
                           {user.is_admin && (
-                            <Link
-                              href="/admin/mailing"
-                              className="account-dropdown-item"
-                              role="menuitem"
-                              onClick={() => setMenuOpen(false)}
-                            >
-                              <MenuItemIcon>
-                                <IconMail />
-                              </MenuItemIcon>
-                              메일 발송
-                            </Link>
+                            <>
+                              <Link
+                                href="/admin/slots"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconKey />
+                                </MenuItemIcon>
+                                코드 슬롯 관리
+                              </Link>
+                              <Link
+                                href="/admin/mailing"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconMail />
+                                </MenuItemIcon>
+                                메일 발송
+                              </Link>
+                            </>
                           )}
                         </>
                       )}

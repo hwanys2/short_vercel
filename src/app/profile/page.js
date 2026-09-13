@@ -473,7 +473,33 @@ export default function ProfilePage() {
                   <h2>관리자 메뉴</h2>
                   <p>관리자 전용 기능입니다.</p>
                 </div>
-                <div className="profile-panel-body">
+                <div className="profile-panel-body" style={{ display: 'grid', gap: '16px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>본인코드 슬롯 관리</div>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        특정 사용자의 본인코드 최대 보유 슬롯(기본 2개)을 늘려줍니다.
+                      </p>
+                    </div>
+                    <Link
+                      href="/admin/slots"
+                      className="btn btn-secondary btn-sm"
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      슬롯 관리 →
+                    </Link>
+                  </div>
+
+                  <div style={{ height: '1px', background: 'var(--border-color, #e5e7eb)' }} />
+
                   <div
                     style={{
                       display: 'flex',

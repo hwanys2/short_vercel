@@ -315,7 +315,7 @@ export default function AdminMailingPage() {
             </p>
           </div>
 
-          <div className="mailing-tabs" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <div className="mailing-tabs" style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
               className={`btn btn-sm ${activeTab === 'compose' ? 'btn-primary' : 'btn-secondary'}`}
@@ -330,6 +330,13 @@ export default function AdminMailingPage() {
             >
               발송 내역
             </button>
+            <Link
+              href="/admin/slots"
+              className="btn btn-sm btn-secondary"
+              style={{ marginLeft: 'auto' }}
+            >
+              본인코드 슬롯 관리 →
+            </Link>
           </div>
 
           {statusMsg && activeTab === 'compose' && (
