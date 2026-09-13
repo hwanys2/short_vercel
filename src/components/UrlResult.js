@@ -1,6 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
+import { formatTempExpiryDate, formatTempRemaining } from '@/lib/tempLinks';
 
 const QR_PREVIEW = 160;
 const QR_MODAL = 320;
@@ -82,20 +84,19 @@ export default function UrlResult({ data, user }) {
     a.remove();
   }, [data.short_url]);
 
+  // 회원 본인 코드 링크만 영구. 임시 주소(is_temp)와 비회원 링크는 만료일 표시
+  const isTemp = Boolean(data.is_temp);
+  const isMemberPermanent = Boolean(user?.id) && !isTemp;
   const expirationText =
-    data.type === 'file' && user
+    data.type === 'file' && isMemberPermanent
       ? '최근 3개월 미접속 시 자동 삭제'
-      : user
+      : isMemberPermanent
         ? '영구적으로 사용 가능'
         : (() => {
-            const exp = new Date(data.expiration_date);
-            const now = new Date();
-            const diff = exp - now;
-            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-            if (days <= 1) return '24시간 후 만료';
-            if (days <= 2) return '48시간 후 만료';
-            if (days <= 7) return '1주일 후 만료';
-            return '1개월 후 만료';
+            const remaining = formatTempRemaining(data.expiration_date);
+            const at = formatTempExpiryDate(data.expiration_date);
+            if (!remaining) return '만료 기간 있음';
+            return at ? `${remaining} (${at})` : remaining;
           })();
 
   const resultIcon = data.type === 'text' ? '📋' : data.type === 'file' ? '📎' : '✅';
@@ -172,6 +173,12 @@ export default function UrlResult({ data, user }) {
               ⏰ {expirationText}
             </span>
           </div>
+          {isTemp && user?.id && (
+            <p className="result-temp-note">
+              ⏳ 임시 주소입니다. <Link href="/dashboard?scope=temp">대시보드</Link>에서 만료 전까지 수정·삭제하거나
+              기간을 다시 설정할 수 있고, 내 코드 주소로 전환할 수도 있어요.
+            </p>
+          )}
         </div>
       </div>
 

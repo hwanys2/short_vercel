@@ -5,7 +5,8 @@ import { requireAppUser } from '@/lib/session';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
 import { deleteShortUrlWithFile } from '@/lib/shortFiles';
-import { pickUserCode } from '@/lib/userCodes';
+import { resolveLinkScope } from '@/lib/userCodes';
+import { tempLinkExpirationIso } from '@/lib/tempLinks';
 
 const MAX_TEXT_LENGTH = 50000;
 
@@ -83,16 +84,20 @@ export async function POST(request) {
     const user = await requireAppUser(request);
     const userId = user?.id || null;
     let ownerCode = null;
+    // 회원이 code_id='temp' 로 요청하면 본인 코드 없이 임시 주소(숏.한국/코드)로 생성
+    let isTemp = false;
     if (userId) {
-      const picked = pickUserCode(user, code_id);
-      if (!picked.ok) {
+      const scope = resolveLinkScope(user, code_id);
+      if (!scope.ok) {
         return NextResponse.json(
-          { status: 'error', message: picked.message },
-          { status: picked.status }
+          { status: 'error', message: scope.message },
+          { status: scope.status }
         );
       }
-      ownerCode = picked.code;
+      isTemp = scope.temp;
+      ownerCode = scope.code;
     }
+    const isMemberPermanent = Boolean(userId && ownerCode && !isTemp);
 
     const supabase = getSupabaseAdmin();
 
@@ -102,7 +107,7 @@ export async function POST(request) {
       .select('id, expiration_date, user_id, type, file_path')
       .eq('code', code);
 
-    if (userId && ownerCode) {
+    if (isMemberPermanent) {
       query = query.eq('user_code_id', ownerCode.id);
     } else {
       query = query.is('user_id', null);
@@ -113,7 +118,7 @@ export async function POST(request) {
     if (existing) {
       const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
       if (!isExpired) {
-        const message = userId
+        const message = isMemberPermanent
           ? memberDuplicateCodeMessage()
           : guestDuplicateCodeMessage(existing.expiration_date);
         return NextResponse.json(
@@ -131,18 +136,12 @@ export async function POST(request) {
 
     // 만료일 계산
     let expirationDate;
-    if (userId) {
-      // 회원은 100년
+    if (isMemberPermanent) {
+      // 회원 본인 코드 링크는 100년
       expirationDate = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
     } else {
-      const durations = {
-        '24h': 24 * 60 * 60 * 1000,
-        '48h': 48 * 60 * 60 * 1000,
-        '1week': 7 * 24 * 60 * 60 * 1000,
-        '1month': 30 * 24 * 60 * 60 * 1000,
-      };
-      const duration = durations[expire_duration] || durations['1week'];
-      expirationDate = new Date(Date.now() + duration).toISOString();
+      // 비회원 및 회원 임시 주소: 선택한 기간 (기본 1주일)
+      expirationDate = tempLinkExpirationIso(expire_duration, '1week');
     }
 
     // 데이터 삽입
@@ -158,9 +157,13 @@ export async function POST(request) {
       insertData.text_content = body.text_content;
     }
 
-    if (userId && ownerCode) {
+    if (isMemberPermanent) {
       insertData.user_id = userId;
       insertData.user_code_id = ownerCode.id;
+      insertData.created_by_user_id = userId;
+    } else if (userId && isTemp) {
+      // 임시 주소: 비회원 네임스페이스(user_id NULL)에 두고 생성자만 기록 → 대시보드에서 관리
+      insertData.created_by_user_id = userId;
     }
 
     if (body.link_password_enabled === true) {
@@ -190,7 +193,7 @@ export async function POST(request) {
 
     const shortUrl = buildShortUrl({
       code,
-      username: ownerCode ? ownerCode.username : undefined,
+      username: isMemberPermanent ? ownerCode.username : undefined,
     });
 
     const successMessage = type === 'text'
@@ -207,8 +210,10 @@ export async function POST(request) {
           code,
           expiration_date: expirationDate,
           type,
-          username: ownerCode?.username || null,
-          user_code_id: ownerCode?.id || null,
+          username: isMemberPermanent ? ownerCode.username : null,
+          user_code_id: isMemberPermanent ? ownerCode.id : null,
+          is_temp: Boolean(userId && isTemp),
+          managed: Boolean(userId),
         },
       },
       { status: 201 }

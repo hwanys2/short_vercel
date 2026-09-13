@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS short_urls (
   last_visit TIMESTAMPTZ,
   user_id BIGINT REFERENCES short_users(id) ON DELETE CASCADE,
   user_code_id BIGINT REFERENCES short_user_codes(id), -- 링크가 속한 본인코드 (회원만)
+  -- 생성 회원. 임시 주소(숏.한국/코드)는 user_id NULL 이지만 created_by_user_id 로 대시보드에서 관리
+  created_by_user_id BIGINT REFERENCES short_users(id) ON DELETE CASCADE,
   -- 회원 단축 URL 비밀번호 보호 (NULL = 비활성)
   link_password_hash TEXT,
   link_password_unlock_version INTEGER NOT NULL DEFAULT 0
@@ -70,6 +72,8 @@ CREATE TABLE IF NOT EXISTS short_urls (
 CREATE INDEX IF NOT EXISTS idx_short_urls_code ON short_urls(code);
 CREATE INDEX IF NOT EXISTS idx_short_urls_user_id ON short_urls(user_id);
 CREATE INDEX IF NOT EXISTS idx_short_urls_user_code_id ON short_urls(user_code_id);
+CREATE INDEX IF NOT EXISTS idx_short_urls_created_by_user_id
+  ON short_urls(created_by_user_id) WHERE created_by_user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_short_urls_expiration ON short_urls(expiration_date);
 
 -- user_id가 NULL인 경우를 위한 부분 유니크 인덱스
@@ -214,8 +218,12 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
+-- 회원 임시 주소 관리용 생성자 컬럼 (scripts/add-temp-links.sql 참고 — 백필·트리거 포함)
+ALTER TABLE short_urls
+  ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT REFERENCES short_users(id) ON DELETE CASCADE;
+
 -- 자동 정리: Vercel Cron → /api/cron/cleanup (CRON_SECRET)
--- (A) 비회원: expiration_date < NOW() → DB 삭제 (+ type=file 이면 Storage도 삭제)
+-- (A) 비회원·회원 임시 주소(user_id NULL): expiration_date < NOW() → DB 삭제 (+ type=file 이면 Storage도 삭제)
 -- (B) 회원 파일 만료: expiration_date < NOW() 이고 file_path 있음 → R2만 삭제, 행 유지(file_path=null)
 -- (C) 회원 파일만: COALESCE(last_visit, created_at) < NOW() - 3 months → 링크·파일 삭제
 

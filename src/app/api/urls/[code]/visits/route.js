@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
-import { pickUserCode } from '@/lib/userCodes';
+import { resolveLinkScope } from '@/lib/userCodes';
 
 function decodeCodeParam(code) {
   try {
@@ -52,18 +52,17 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const daysRaw = parseInt(searchParams.get('days') || '30', 10);
     const days = [7, 30].includes(daysRaw) ? daysRaw : 30;
-    const scoped = pickUserCode(user, searchParams.get('code_id'));
+    const scoped = resolveLinkScope(user, searchParams.get('code_id'));
     if (!scoped.ok) {
       return NextResponse.json({ success: false, message: scoped.message }, { status: scoped.status });
     }
 
     const supabase = getSupabaseAdmin();
-    const { data: row, error } = await supabase
-      .from('short_urls')
-      .select('id, code, visits')
-      .eq('code', code)
-      .eq('user_code_id', scoped.code.id)
-      .maybeSingle();
+    let rowQuery = supabase.from('short_urls').select('id, code, visits').eq('code', code);
+    rowQuery = scoped.temp
+      ? rowQuery.is('user_id', null).eq('created_by_user_id', user.id)
+      : rowQuery.eq('user_code_id', scoped.code.id).eq('user_id', user.id);
+    const { data: row, error } = await rowQuery.maybeSingle();
 
     if (error) throw error;
     if (!row) {

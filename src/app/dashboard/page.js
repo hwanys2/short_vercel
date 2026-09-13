@@ -12,6 +12,13 @@ import {
   getFileCapacityRetentionInfo,
 } from '@/lib/shortFilesShared';
 import { uploadShortFileAuto } from '@/lib/fileUploadClient';
+import { useLinkScope, parseScopeSelectValue } from '@/lib/useLinkScope';
+import {
+  TEMP_SCOPE,
+  TEMP_LINK_DURATION_OPTIONS,
+  formatTempExpiryDate,
+  formatTempRemaining,
+} from '@/lib/tempLinks';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -27,8 +34,18 @@ export default function DashboardPage() {
   const [appliedQ, setAppliedQ] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [fileStatus, setFileStatus] = useState('all');
-  const [filterCodeId, setFilterCodeId] = useState('all');
-  const [createCodeId, setCreateCodeId] = useState(null);
+  const [filterCodeId, setFilterCodeId] = useState('all'); // 'all' | 'temp' | number
+
+  // 생성 대상: 본인 코드(영구) 또는 임시 주소(숏.한국/코드)
+  const {
+    scope: createScope,
+    isTemp: createIsTemp,
+    codes: userCodes,
+    activeUsername: createUsername,
+    setScope: setCreateScope,
+    selectValue: createScopeValue,
+  } = useLinkScope(user);
+  const [newExpireDuration, setNewExpireDuration] = useState('1week');
 
   // 새 URL 생성 폼
   const [newUrl, setNewUrl] = useState('');
@@ -90,15 +107,11 @@ export default function DashboardPage() {
           router.push('/onboarding');
         } else {
           setUser(data.user);
-          const codes = data.user.codes || [];
-          const primaryId = data.user.primary_code_id || codes.find((c) => c.is_primary)?.id || codes[0]?.id || null;
-          let saved = null;
+          // 결과 화면의 "대시보드" 링크(?scope=temp)로 들어오면 임시 주소 필터를 미리 켠다
           try {
-            saved = localStorage.getItem(`short_create_code_id_${data.user.id}`);
+            const scopeParam = new URLSearchParams(window.location.search).get('scope');
+            if (scopeParam === TEMP_SCOPE) setFilterCodeId(TEMP_SCOPE);
           } catch {}
-          const savedNum = saved != null ? Number(saved) : null;
-          const validSaved = codes.some((c) => Number(c.id) === savedNum) ? savedNum : null;
-          setCreateCodeId(validSaved || primaryId);
         }
       })
       .catch(() => router.push('/login'));
@@ -108,22 +121,20 @@ export default function DashboardPage() {
     if (user) fetchUrls();
   }, [user, page, appliedQ, filterType, fileStatus, filterCodeId]);
 
-  const userCodes = user?.codes || [];
   const hasMultipleCodes = userCodes.length > 1;
-  const activeCreateCode =
-    userCodes.find((c) => Number(c.id) === Number(createCodeId)) ||
-    userCodes.find((c) => c.is_primary) ||
-    userCodes[0];
-  const createUsername = activeCreateCode?.username || user?.username;
+  const hasScopeFilter = filterCodeId !== 'all';
+  const hasAnyFilter = Boolean(appliedQ) || filterType !== 'all' || fileStatus !== 'all' || hasScopeFilter;
 
-  const setCreateCodeIdPersist = (id) => {
-    setCreateCodeId(id);
-    if (user?.id) {
-      try {
-        localStorage.setItem(`short_create_code_id_${user.id}`, String(id));
-      } catch {}
-    }
-  };
+  // 임시 주소 + 파일: 용량별 보관 기간이 우선 (10MB 초과는 선택 불가)
+  const newFileForcedDuration =
+    newMode === 'file' && newFile
+      ? newFile.size > 1024 * 1024 * 1024
+        ? '48h'
+        : newFile.size > 10 * 1024 * 1024
+          ? '1week'
+          : null
+      : null;
+  const showCreateDuration = createIsTemp && !(newMode === 'file' && newFileForcedDuration);
 
   const fetchUrls = async () => {
     setLoading(true);
@@ -183,10 +194,9 @@ export default function DashboardPage() {
           return;
         }
 
+        // 본인 코드: 용량별 보관 기간 / 임시 주소: 10MB 이하는 선택 기간, 초과는 용량별 강제
         const fileExpireDuration =
-          newFile.size > 1024 * 1024 * 1024
-            ? '48h'
-            : (newFile.size > 10 * 1024 * 1024 ? '1week' : '1month');
+          newFileForcedDuration || (createIsTemp ? newExpireDuration : '1month');
 
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
@@ -194,7 +204,7 @@ export default function DashboardPage() {
         const uploaded = await uploadShortFileAuto({
           file: newFile,
           customCode: newCode.trim(),
-          codeId: createCodeId,
+          codeId: createScope,
           expireDuration: fileExpireDuration,
           linkPasswordEnabled: false,
           onProgress: (prog) => {
@@ -211,9 +221,10 @@ export default function DashboardPage() {
                 short_url: buildShortUrl({
                   baseUrl,
                   code: newCode.trim(),
-                  username: createUsername,
+                  username: createIsTemp ? undefined : createUsername,
                 }),
                 type: 'file',
+                is_temp: createIsTemp,
                 expiration_date: null,
               });
 
@@ -231,8 +242,9 @@ export default function DashboardPage() {
       const body = {
         custom_code: newCode,
         type: newMode,
-        code_id: createCodeId,
+        code_id: createScope,
       };
+      if (createIsTemp) body.expire_duration = newExpireDuration;
       if (newMode === 'url') {
         body.original_url = newUrl;
       } else {
@@ -251,9 +263,10 @@ export default function DashboardPage() {
             short_url: buildShortUrl({
               baseUrl,
               code: newCode.trim(),
-              username: createUsername,
+              username: createIsTemp ? undefined : createUsername,
             }),
             type: newMode,
+            is_temp: createIsTemp,
             expiration_date: null,
           };
         setCreateResult(resultData);
@@ -281,10 +294,15 @@ export default function DashboardPage() {
     }
   };
 
+  /** 행의 스코프 파라미터: 임시 주소면 'temp', 아니면 본인 코드 id */
+  const rowScopeParam = (url) => (url.is_temp ? TEMP_SCOPE : url.user_code_id ? String(url.user_code_id) : '');
+
   const handleDelete = async (url) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const label = url.is_temp ? '임시 주소를' : 'URL을';
+    if (!confirm(`정말 이 ${label} 삭제하시겠습니까?`)) return;
     try {
-      const qs = url.user_code_id ? `?code_id=${encodeURIComponent(url.user_code_id)}` : '';
+      const scopeParam = rowScopeParam(url);
+      const qs = scopeParam ? `?code_id=${encodeURIComponent(scopeParam)}` : '';
       const res = await fetch(`/api/urls/${encodeURIComponent(url.code)}${qs}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
@@ -301,10 +319,15 @@ export default function DashboardPage() {
     }
   };
 
+  const rowShortUrl = (url) =>
+    buildShortUrl({
+      baseUrl,
+      code: url.code,
+      username: url.is_temp ? undefined : url.code_username || user.username,
+    });
+
   const copyUrl = (url) => {
-    const username = url.code_username || user.username;
-    const short = buildShortUrl({ baseUrl, code: url.code, username });
-    navigator.clipboard.writeText(short).then(() => alert('URL이 복사되었습니다!'));
+    navigator.clipboard.writeText(rowShortUrl(url)).then(() => alert('URL이 복사되었습니다!'));
   };
 
   if (!user) return null;
@@ -317,7 +340,7 @@ export default function DashboardPage() {
           <div className="dashboard-header">
             <h1>{user.username}님의 대시보드</h1>
             <div className="user-badge">
-              ✨ URL·텍스트는 영구 · 파일은 10MB 이하 30일/대용량 7일(만료 시 수정에서 재등록 가능) · {baseUrl}{createUsername}/코드
+              ✨ 내 코드 주소({baseUrl}{createUsername}/코드)는 영구 · 임시 주소({baseUrl}코드)는 만료 후 자동 삭제 · 파일은 용량별 보관
             </div>
           </div>
 
@@ -403,7 +426,10 @@ export default function DashboardPage() {
                     />
 
                     {newFile && (() => {
-                      const info = getFileCapacityRetentionInfo(newFile.size, true);
+                      const info = getFileCapacityRetentionInfo(newFile.size, !createIsTemp);
+                      const afterExpiry = createIsTemp
+                        ? '임시 주소이므로 만료 시 주소도 함께 삭제됩니다'
+                        : '주소는 유지되며 만료 시 수정에서 재등록 가능';
                       return (
                         <div
                           style={{
@@ -427,17 +453,17 @@ export default function DashboardPage() {
                           </div>
                           {newFile.size > 1024 * 1024 * 1024 && (
                             <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(239, 68, 68, 0.3)', color: '#ef4444', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 다운로드 가능 기간: <strong>2일 (48시간 후 만료)</strong> — 주소는 유지되며 만료 시 수정에서 재등록 가능
+                              🔒 다운로드 가능 기간: <strong>2일 (48시간 후 만료)</strong> — {afterExpiry}
                             </div>
                           )}
                           {newFile.size > 10 * 1024 * 1024 && newFile.size <= 1024 * 1024 * 1024 && (
                             <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', color: '#047857', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 다운로드 가능 기간: <strong>7일 (1주일 후 만료)</strong> — 주소는 유지되며 만료 시 수정에서 재등록 가능
+                              🔒 다운로드 가능 기간: <strong>7일 (1주일 후 만료)</strong> — {afterExpiry}
                             </div>
                           )}
                           {newFile.size <= 10 * 1024 * 1024 && (
                             <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(37, 99, 235, 0.3)', color: '#2563eb', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 다운로드 가능 기간: <strong>30일 (1개월 후 만료)</strong> — 주소는 유지되며 만료 시 수정에서 재등록 가능
+                              🔒 다운로드 가능 기간: <strong>{createIsTemp ? '선택한 만료 기간 (최대 30일)' : '30일 (1개월 후 만료)'}</strong> — {afterExpiry}
                             </div>
                           )}
                         </div>
@@ -445,29 +471,27 @@ export default function DashboardPage() {
                     })()}
 
                     <p className="url-form-file-hint" style={{ marginTop: '6px' }}>
-                      최대 5GB까지 모든 파일(영상, 문서, ZIP 등) 지원. 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다. (단축 주소는 영구 유지)
+                      최대 5GB까지 모든 파일(영상, 문서, ZIP 등) 지원. 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
+                      {createIsTemp ? ' (임시 주소는 만료 시 주소도 삭제)' : ' (단축 주소는 영구 유지)'}
                     </p>
                   </div>
                 )}
                 <div className="form-group dashboard-create-code">
                   <label className="form-label" htmlFor="dash-code">단축 코드</label>
                   <div className="dashboard-create-code-row">
-                    {hasMultipleCodes ? (
-                      <select
-                        className="form-input dashboard-create-code-select"
-                        aria-label="본인 코드 선택"
-                        value={createCodeId ?? ''}
-                        onChange={(e) => setCreateCodeIdPersist(Number(e.target.value))}
-                      >
-                        {userCodes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.username}/
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="dashboard-create-code-prefix">{createUsername}/</span>
-                    )}
+                    <select
+                      className={`form-input dashboard-create-code-select${createIsTemp ? ' is-temp' : ''}`}
+                      aria-label="주소 형태 선택 (내 코드 또는 임시 주소)"
+                      value={createScopeValue}
+                      onChange={(e) => setCreateScope(parseScopeSelectValue(e.target.value))}
+                    >
+                      {userCodes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.username}/
+                        </option>
+                      ))}
+                      <option value={TEMP_SCOPE}>임시 · 숏.한국/</option>
+                    </select>
                     <input
                       id="dash-code"
                       type="text"
@@ -481,6 +505,36 @@ export default function DashboardPage() {
                     />
                   </div>
                 </div>
+
+                {createIsTemp && (
+                  <div className="form-group dashboard-create-duration">
+                    <label className="form-label">임시 주소 만료 기간</label>
+                    {showCreateDuration ? (
+                      <div className="duration-options" style={{ justifyContent: 'flex-start' }}>
+                        {TEMP_LINK_DURATION_OPTIONS.map((opt) => (
+                          <div key={opt.value} className="duration-option">
+                            <input
+                              type="radio"
+                              id={`dash-dur-${opt.value}`}
+                              name="dash_expire_duration"
+                              value={opt.value}
+                              checked={newExpireDuration === opt.value}
+                              onChange={(e) => setNewExpireDuration(e.target.value)}
+                            />
+                            <label htmlFor={`dash-dur-${opt.value}`}>{opt.label}</label>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="dashboard-create-duration-hint" style={{ marginTop: 0 }}>
+                        🔒 {newFileForcedDuration === '48h' ? '1GB 초과 파일은 2일(48시간)' : '10MB 초과 파일은 7일(1주일)'} 후 자동 만료됩니다.
+                      </p>
+                    )}
+                    <p className="dashboard-create-duration-hint">
+                      ⏳ 임시 주소는 내 코드 없이 <strong>{baseUrl}코드</strong> 형태로 만들어지며, 만료되면 자동 삭제됩니다. 만료 전 수정에서 기간을 다시 설정하거나 내 코드 주소로 전환할 수 있어요.
+                    </p>
+                  </div>
+                )}
 
                 {uploadProgress && (
                   <div style={{ width: '100%', margin: '12px 0', padding: '12px', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '6px', border: '1px solid var(--border-color, #e2e8f0)' }}>
@@ -552,7 +606,7 @@ export default function DashboardPage() {
                     aria-label="단축 주소 검색"
                   />
                   <button type="submit" className="btn btn-secondary btn-sm">검색</button>
-                  {(appliedQ || filterType !== 'all' || fileStatus !== 'all' || filterCodeId !== 'all') && (
+                  {hasAnyFilter && (
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
@@ -569,33 +623,43 @@ export default function DashboardPage() {
                     </button>
                   )}
                 </form>
-                {hasMultipleCodes && (
-                  <div className="dashboard-filter-chips" role="group" aria-label="본인코드 필터">
+                <div className="dashboard-filter-chips" role="group" aria-label="주소 형태 필터">
+                  <button
+                    type="button"
+                    className={`dash-chip ${filterCodeId === 'all' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setFilterCodeId('all');
+                      setPage(1);
+                    }}
+                  >
+                    전체
+                  </button>
+                  {userCodes.map((c) => (
                     <button
+                      key={c.id}
                       type="button"
-                      className={`dash-chip ${filterCodeId === 'all' ? 'is-active' : ''}`}
+                      className={`dash-chip ${filterCodeId !== TEMP_SCOPE && Number(filterCodeId) === Number(c.id) ? 'is-active' : ''}`}
                       onClick={() => {
-                        setFilterCodeId('all');
+                        setFilterCodeId(c.id);
                         setPage(1);
                       }}
+                      title={hasMultipleCodes ? `${c.username}/ 아래 주소만 보기` : '내 코드 주소만 보기'}
                     >
-                      전체
+                      {c.username}/
                     </button>
-                    {userCodes.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`dash-chip ${Number(filterCodeId) === Number(c.id) ? 'is-active' : ''}`}
-                        onClick={() => {
-                          setFilterCodeId(c.id);
-                          setPage(1);
-                        }}
-                      >
-                        {c.username}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  ))}
+                  <button
+                    type="button"
+                    className={`dash-chip is-temp ${filterCodeId === TEMP_SCOPE ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setFilterCodeId(TEMP_SCOPE);
+                      setPage(1);
+                    }}
+                    title="내 코드 없이 만든 임시 주소(숏.한국/코드)만 보기"
+                  >
+                    ⏳ 임시 주소
+                  </button>
+                </div>
                 <div className="dashboard-filter-chips" role="group" aria-label="타입 필터">
                   {[
                     { id: 'all', label: '전체' },
@@ -647,8 +711,14 @@ export default function DashboardPage() {
               ) : urls.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon">📂</div>
-                  <h3>{appliedQ || filterType !== 'all' || fileStatus !== 'all' || filterCodeId !== 'all' ? '검색 결과가 없습니다' : '아직 생성된 URL이 없습니다'}</h3>
-                  <p>{appliedQ || filterType !== 'all' || fileStatus !== 'all' || filterCodeId !== 'all' ? '다른 조건으로 다시 검색해 보세요.' : '위 폼을 사용하여 첫 번째 영구 URL을 만들어보세요!'}</p>
+                  <h3>{hasAnyFilter ? '검색 결과가 없습니다' : '아직 생성된 URL이 없습니다'}</h3>
+                  <p>
+                    {filterCodeId === TEMP_SCOPE && !appliedQ && filterType === 'all' && fileStatus === 'all'
+                      ? '아직 임시 주소가 없어요. 위 폼에서 "임시 · 숏.한국/"을 선택해 만들 수 있습니다.'
+                      : hasAnyFilter
+                        ? '다른 조건으로 다시 검색해 보세요.'
+                        : '위 폼을 사용하여 첫 번째 영구 URL을 만들어보세요!'}
+                  </p>
                 </div>
               ) : (
                 <div className="table-wrapper">
@@ -666,13 +736,26 @@ export default function DashboardPage() {
                     <tbody>
                       {urls.map((url) => {
                         const codeUsername = url.code_username || user.username;
+                        const rowKey = url.is_temp ? `temp-${url.code}` : `${url.user_code_id || 'p'}-${url.code}`;
+                        const editHref = `/dashboard/edit/${encodeURIComponent(url.code)}?code_id=${encodeURIComponent(rowScopeParam(url))}`;
                         return (
-                        <tr key={`${url.user_code_id || 'p'}-${url.code}`}>
+                        <tr key={rowKey}>
                           <td>{url.type === 'text' ? '📋' : url.type === 'file' ? '📎' : '🔗'}</td>
                           <td>
-                            <a href={buildShortUrl({ baseUrl, code: url.code, username: codeUsername })} target="_blank" rel="noopener noreferrer">
-                              {codeUsername}/{url.code}
+                            <a href={rowShortUrl(url)} target="_blank" rel="noopener noreferrer">
+                              {url.is_temp ? url.code : `${codeUsername}/${url.code}`}
                             </a>
+                            {url.is_temp && (
+                              <>
+                                <span className="dash-scope-badge" title="내 코드 없이 만든 임시 주소 (만료 후 자동 삭제)">임시</span>
+                                <span
+                                  className={`dash-link-expiry ${url.link_retention === 'expired' ? 'is-expired' : url.link_retention === 'expiring' ? 'is-expiring' : ''}`}
+                                  title={url.expiration_date ? `만료: ${formatTempExpiryDate(url.expiration_date)}` : ''}
+                                >
+                                  ⏳ {formatTempRemaining(url.expiration_date) || '만료 기간 있음'}
+                                </span>
+                              </>
+                            )}
                           </td>
                           <td className="url-cell" title={
                             url.type === 'text'
@@ -708,9 +791,9 @@ export default function DashboardPage() {
                           <td>
                             <div className="url-actions">
                               <Link
-                                href={`/dashboard/edit/${encodeURIComponent(url.code)}${url.user_code_id ? `?code_id=${url.user_code_id}` : ''}`}
+                                href={editHref}
                                 className="btn btn-secondary btn-icon"
-                                title="수정"
+                                title={url.is_temp ? '수정 · 기간 재설정 · 내 코드로 전환' : '수정'}
                                 aria-label="수정"
                               >
                                 ✏️

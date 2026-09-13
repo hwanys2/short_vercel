@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
-import { pickUserCode } from '@/lib/userCodes';
+import { resolveLinkScope } from '@/lib/userCodes';
 
 export async function GET(request) {
   try {
@@ -23,11 +23,16 @@ export async function GET(request) {
       .eq('code', code);
 
     if (userId) {
-      const picked = pickUserCode(user, codeIdParam);
-      if (!picked.ok) {
-        return NextResponse.json({ available: false, message: picked.message });
+      const scope = resolveLinkScope(user, codeIdParam);
+      if (!scope.ok) {
+        return NextResponse.json({ available: false, message: scope.message });
       }
-      query = query.eq('user_code_id', picked.code.id);
+      if (scope.temp) {
+        // 회원 임시 주소(숏.한국/코드)는 비회원과 같은 네임스페이스
+        query = query.is('user_id', null);
+      } else {
+        query = query.eq('user_code_id', scope.code.id);
+      }
     } else {
       query = query.is('user_id', null);
     }

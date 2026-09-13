@@ -7,6 +7,21 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { formatFileSize, MAX_FILE_BYTES, getFileCapacityRetentionInfo } from '@/lib/shortFilesShared';
 import { uploadFileToR2Only } from '@/lib/fileUploadClient';
+import {
+  TEMP_SCOPE,
+  TEMP_LINK_DURATION_OPTIONS,
+  formatTempExpiryDate,
+  formatTempRemaining,
+  isTempScope,
+} from '@/lib/tempLinks';
+
+/** 쿼리/응답의 스코프 값 → 'temp' | number | null */
+function parseScopeValue(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  if (isTempScope(String(raw))) return TEMP_SCOPE;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 export default function EditUrlPage() {
   return (
@@ -48,8 +63,11 @@ function EditUrlPageInner() {
   const [replacementFile, setReplacementFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [customCode, setCustomCode] = useState('');
-  const [scopeCodeId, setScopeCodeId] = useState(initialCodeId ? Number(initialCodeId) : null);
-  const [targetCodeId, setTargetCodeId] = useState(initialCodeId ? Number(initialCodeId) : null);
+  // scopeCodeId: 현재 링크가 속한 곳 ('temp' | 본인 코드 id). targetScope: 저장 시 이동할 곳
+  const [scopeCodeId, setScopeCodeId] = useState(() => parseScopeValue(initialCodeId));
+  const [targetScope, setTargetScope] = useState(() => parseScopeValue(initialCodeId));
+  // 임시 주소 만료 기간: '' = 그대로 유지, 그 외 = 지금부터 재설정
+  const [expireDuration, setExpireDuration] = useState('');
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [hadPasswordProtection, setHadPasswordProtection] = useState(false);
   const [linkPassword, setLinkPassword] = useState('');
@@ -63,12 +81,17 @@ function EditUrlPageInner() {
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
   const userCodes = user?.codes || [];
-  const hasMultipleCodes = userCodes.length > 1;
-  const activeCode =
-    userCodes.find((c) => Number(c.id) === Number(targetCodeId)) ||
-    userCodes.find((c) => c.is_primary) ||
-    userCodes[0];
+  const isCurrentlyTemp = scopeCodeId === TEMP_SCOPE;
+  const isTargetTemp = targetScope === TEMP_SCOPE;
+  const activeCode = isTargetTemp
+    ? null
+    : userCodes.find((c) => Number(c.id) === Number(targetScope)) ||
+      userCodes.find((c) => c.is_primary) ||
+      userCodes[0];
   const displayUsername = activeCode?.username || user?.username;
+  const convertingToTemp = isTargetTemp && !isCurrentlyTemp;
+  const convertingToPermanent = !isTargetTemp && isCurrentlyTemp;
+  const scopeQuery = scopeCodeId == null ? '' : String(scopeCodeId);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -91,7 +114,7 @@ function EditUrlPageInner() {
     setLoadingUrl(true);
     setError('');
     try {
-      const qs = scopeCodeId ? `?code_id=${encodeURIComponent(scopeCodeId)}` : '';
+      const qs = scopeCodeId != null ? `?code_id=${encodeURIComponent(String(scopeCodeId))}` : '';
       const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}${qs}`);
       const data = await res.json();
       if (!data.success) {
@@ -110,10 +133,14 @@ function EditUrlPageInner() {
       setExpirationDate(data.url.expiration_date || null);
       setReplacementFile(null);
       setCustomCode(data.url.code);
-      if (data.url.user_code_id != null) {
+      setExpireDuration('');
+      if (data.url.is_temp) {
+        setScopeCodeId(TEMP_SCOPE);
+        setTargetScope(TEMP_SCOPE);
+      } else if (data.url.user_code_id != null) {
         const cid = Number(data.url.user_code_id);
         setScopeCodeId(cid);
-        setTargetCodeId(cid);
+        setTargetScope(cid);
       }
       const protectedNow = !!data.url.password_enabled;
       setPasswordEnabled(protectedNow);
@@ -138,7 +165,7 @@ function EditUrlPageInner() {
     let ignore = false;
     setVisitsLoading(true);
     const qs = new URLSearchParams({ days: String(visitDays) });
-    if (scopeCodeId) qs.set('code_id', String(scopeCodeId));
+    if (scopeCodeId != null) qs.set('code_id', String(scopeCodeId));
     fetch(`/api/urls/${encodeURIComponent(routeCode)}/visits?${qs}`)
       .then((res) => res.json())
       .then((data) => {
@@ -177,14 +204,22 @@ function EditUrlPageInner() {
       return;
     }
 
+    if (convertingToTemp && !expireDuration && urlType !== 'file') {
+      setError('임시 주소로 전환할 때는 만료 기간을 선택해주세요.');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         custom_code: customCode,
         link_password_enabled: passwordEnabled,
         code_id: scopeCodeId,
-        user_code_id: targetCodeId,
+        user_code_id: targetScope,
       };
+      if (isTargetTemp && expireDuration && urlType !== 'file') {
+        payload.expire_duration = expireDuration;
+      }
 
       if (urlType === 'text') {
         payload.text_content = textContent;
@@ -220,7 +255,7 @@ function EditUrlPageInner() {
         payload.link_password = linkPassword.trim();
       }
 
-      const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}?code_id=${encodeURIComponent(scopeCodeId || '')}`, {
+      const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}?code_id=${encodeURIComponent(scopeQuery)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -259,6 +294,7 @@ function EditUrlPageInner() {
   const isFile = urlType === 'file';
   const pageTitle = isText ? '텍스트 수정' : isFile ? '파일 공유 수정' : 'URL 수정';
   const cardTitle = isText ? '📋 텍스트 편집' : isFile ? '📎 파일 공유 편집' : '✏️ 단축 URL 편집';
+  const linkExpired = expirationDate && new Date(expirationDate) <= new Date();
 
   return (
     <>
@@ -268,8 +304,11 @@ function EditUrlPageInner() {
           <div className="dashboard-header">
             <h1>{pageTitle}</h1>
             <div className="user-badge">
-              단축 주소: {baseUrl}
-              {displayUsername}/코드
+              {isTargetTemp ? (
+                <>⏳ 임시 주소: {baseUrl}{customCode || '코드'}</>
+              ) : (
+                <>단축 주소: {baseUrl}{displayUsername}/코드</>
+              )}
             </div>
           </div>
 
@@ -461,25 +500,26 @@ function EditUrlPageInner() {
                   <div className="form-group">
                     <label className="form-label" htmlFor="edit-code">단축 코드</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      {hasMultipleCodes ? (
-                        <select
-                          className="form-input"
-                          style={{ width: 'auto', minWidth: '120px' }}
-                          aria-label="본인 코드"
-                          value={targetCodeId ?? ''}
-                          onChange={(e) => setTargetCodeId(Number(e.target.value))}
-                        >
-                          {userCodes.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.username}/
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                          {displayUsername}/
-                        </span>
-                      )}
+                      <select
+                        className={`form-input${isTargetTemp ? ' is-temp' : ''}`}
+                        style={{ width: 'auto', minWidth: '140px' }}
+                        aria-label="주소 형태 (내 코드 또는 임시 주소)"
+                        value={targetScope == null ? '' : String(targetScope)}
+                        onChange={(e) => {
+                          const next = parseScopeValue(e.target.value);
+                          setTargetScope(next);
+                          // 임시 주소로 새로 전환하면 기본 1주일, 아니면 유지
+                          if (next === TEMP_SCOPE && !isCurrentlyTemp) setExpireDuration('1week');
+                          else if (next !== TEMP_SCOPE) setExpireDuration('');
+                        }}
+                      >
+                        {userCodes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.username}/
+                          </option>
+                        ))}
+                        <option value={TEMP_SCOPE}>임시 · 숏.한국/</option>
+                      </select>
                       <input
                         id="edit-code"
                         type="text"
@@ -493,12 +533,73 @@ function EditUrlPageInner() {
                         title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
                       />
                     </div>
-                    {hasMultipleCodes && (
-                      <p className="profile-hint" style={{ marginTop: 6 }}>
-                        본인 코드를 바꾸면 단축 주소가 새 코드 아래로 이동합니다.
-                      </p>
-                    )}
+                    <p className="profile-hint" style={{ marginTop: 6 }}>
+                      {convertingToPermanent
+                        ? '✨ 저장하면 내 코드 아래의 영구 주소로 전환됩니다. 만료 기간이 사라지고 주소가 바뀌니 공유한 곳을 업데이트해 주세요.'
+                        : convertingToTemp
+                          ? '⏳ 저장하면 내 코드 없이 숏.한국/코드 형태의 임시 주소가 됩니다. 만료되면 자동 삭제되니 주의하세요.'
+                          : isTargetTemp
+                            ? '임시 주소는 모든 사용자가 함께 쓰는 공간이라 다른 사람이 쓰는 코드로는 바꿀 수 없습니다.'
+                            : userCodes.length > 1
+                              ? '본인 코드를 바꾸면 단축 주소가 새 코드 아래로 이동합니다.'
+                              : '"임시 · 숏.한국/"을 선택하면 내 코드 없는 짧은 임시 주소로 바꿀 수 있습니다.'}
+                    </p>
                   </div>
+
+                  {/* 임시 주소 만료 기간 */}
+                  {isTargetTemp && (
+                    <div className="form-group" style={{ background: 'rgba(245, 158, 11, 0.06)', padding: '14px 16px', borderRadius: '10px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                      <label className="form-label" style={{ fontWeight: 600 }}>⏳ 임시 주소 만료 기간</label>
+                      {isCurrentlyTemp && expirationDate && (
+                        <p style={{ margin: '0 0 10px', fontSize: '0.85rem', color: linkExpired ? '#ef4444' : 'var(--text-secondary)' }}>
+                          현재 만료: <strong>{formatTempExpiryDate(expirationDate)}</strong>
+                          {' '}({formatTempRemaining(expirationDate)})
+                          {linkExpired && ' — 만료된 주소는 곧 자동 삭제됩니다. 기간을 다시 설정하거나 내 코드 주소로 전환하세요.'}
+                        </p>
+                      )}
+                      {isFile ? (
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                          파일 임시 주소는 파일 보관 기간(10MB 이하 최대 30일, 10MB~1GB 7일, 1GB 초과 2일)에 맞춰 만료됩니다. 새 파일을 등록하면 그 시점부터 다시 계산돼요.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="duration-options" style={{ justifyContent: 'flex-start' }}>
+                            {isCurrentlyTemp && (
+                              <div className="duration-option">
+                                <input
+                                  type="radio"
+                                  id="edit-dur-keep"
+                                  name="edit_expire_duration"
+                                  value=""
+                                  checked={expireDuration === ''}
+                                  onChange={() => setExpireDuration('')}
+                                />
+                                <label htmlFor="edit-dur-keep">그대로 유지</label>
+                              </div>
+                            )}
+                            {TEMP_LINK_DURATION_OPTIONS.map((opt) => (
+                              <div key={opt.value} className="duration-option">
+                                <input
+                                  type="radio"
+                                  id={`edit-dur-${opt.value}`}
+                                  name="edit_expire_duration"
+                                  value={opt.value}
+                                  checked={expireDuration === opt.value}
+                                  onChange={(e) => setExpireDuration(e.target.value)}
+                                />
+                                <label htmlFor={`edit-dur-${opt.value}`}>
+                                  {isCurrentlyTemp ? `지금부터 ${opt.label}` : opt.label}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                          <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                            기간을 선택하면 저장 시점부터 새로 계산됩니다 (최대 30일). 영구 주소가 필요하면 위에서 내 코드를 선택하세요.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {/* 파일 업로드 진행률 바 */}
                   {uploadProgress && (

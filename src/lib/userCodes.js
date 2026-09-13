@@ -1,5 +1,8 @@
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { normalizeUsernameInput } from '@/lib/authBridge';
+import { TEMP_SCOPE, isTempScope } from '@/lib/tempLinks';
+
+export { TEMP_SCOPE, isTempScope };
 
 /** 표시용 기본 한도. 실제 한도는 short_users.max_codes */
 export const MAX_CODES_DEFAULT = 2;
@@ -68,6 +71,23 @@ export function pickUserCode(user, codeIdParam) {
     return { ok: false, message: '본인 코드를 찾을 수 없습니다.', status: 400 };
   }
   return { ok: true, code: found };
+}
+
+/**
+ * 생성/수정 대상 범위 해석.
+ * - code_id === 'temp' → 임시 주소 (숏.한국/코드, user_id NULL 네임스페이스)
+ * - 그 외 → pickUserCode (본인 코드, 없으면 primary)
+ * @param {{ codes?: UserCode[], id?: number }} user
+ * @param {string|number|null|undefined} param
+ * @returns {{ ok: true, temp: true, code: null } | { ok: true, temp: false, code: UserCode } | { ok: false, message: string, status: number }}
+ */
+export function resolveLinkScope(user, param) {
+  if (isTempScope(param)) {
+    return { ok: true, temp: true, code: null };
+  }
+  const picked = pickUserCode(user, param);
+  if (!picked.ok) return picked;
+  return { ok: true, temp: false, code: picked.code };
 }
 
 /**
@@ -158,10 +178,11 @@ export async function loadUserCodes(admin, userId) {
 }
 
 /**
- * code_id 쿼리 파라미터 파싱 (목록 필터용). 'all' | number | null(기본=all)
+ * code_id 쿼리 파라미터 파싱 (목록 필터용). 'all' | 'temp' | number | null(유효하지 않음)
  */
 export function parseCodeIdFilter(raw) {
   if (raw === undefined || raw === null || raw === '' || raw === 'all') return 'all';
+  if (isTempScope(raw)) return TEMP_SCOPE;
   const id = Number(raw);
   if (!Number.isFinite(id) || id <= 0) return null;
   return id;

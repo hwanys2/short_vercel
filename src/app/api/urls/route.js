@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
-import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
+import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
-import { pickUserCode, parseCodeIdFilter } from '@/lib/userCodes';
+import { deleteShortUrlWithFile } from '@/lib/shortFiles';
+import { resolveLinkScope, parseCodeIdFilter, TEMP_SCOPE } from '@/lib/userCodes';
+import { tempLinkExpirationIso, tempLinkRetentionStatus } from '@/lib/tempLinks';
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -55,15 +57,18 @@ export async function GET(request) {
 
     const supabase = getSupabaseAdmin();
 
+    // created_by_user_id: 본인 코드 링크(user_id=나) + 임시 주소(user_id NULL, 내가 생성) 모두 포함
     let query = supabase
       .from('short_urls')
       .select(
-        'id, code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_path, user_code_id',
+        'id, code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_path, user_id, user_code_id',
         { count: 'exact' }
       )
-      .eq('user_id', user.id);
+      .eq('created_by_user_id', user.id);
 
-    if (codeFilter !== 'all') {
+    if (codeFilter === TEMP_SCOPE) {
+      query = query.is('user_code_id', null);
+    } else if (codeFilter !== 'all') {
       const owned = (user.codes || []).some((c) => Number(c.id) === codeFilter);
       if (!owned) {
         return NextResponse.json({ success: false, message: '본인 코드를 찾을 수 없습니다.' }, { status: 400 });
@@ -105,25 +110,33 @@ export async function GET(request) {
 
     if (error) throw error;
 
-    let safeUrls = (urls || []).map(({ link_password_hash, text_content, file_path, ...u }) => {
+    let safeUrls = (urls || []).map(({ link_password_hash, text_content, file_path, user_id, ...u }) => {
       const retention = fileRetentionStatus({ ...u, file_path }, now);
       const codeId = u.user_code_id != null ? Number(u.user_code_id) : null;
+      const isTemp = user_id == null;
       return {
         ...u,
         user_code_id: codeId,
-        code_username: codeId != null ? usernameByCodeId.get(codeId) || user.username : user.username,
+        is_temp: isTemp,
+        code_username: isTemp
+          ? null
+          : codeId != null
+            ? usernameByCodeId.get(codeId) || user.username
+            : user.username,
         password_enabled: !!link_password_hash,
         type: u.type || 'url',
         text_preview: u.type === 'text' && text_content ? text_content.slice(0, 80) : null,
         file_retention: retention,
+        // 임시 주소는 링크 자체가 만료됨 (만료 후 자동 삭제)
+        link_retention: isTemp ? tempLinkRetentionStatus(u.expiration_date, now) : null,
         has_file: !!file_path,
       };
     });
 
     if (fileStatus === 'all' && type === 'all' && !q) {
       const rank = (r) => {
-        if (r.file_retention === 'expired') return 0;
-        if (r.file_retention === 'expiring') return 1;
+        if (r.file_retention === 'expired' || r.link_retention === 'expired') return 0;
+        if (r.file_retention === 'expiring' || r.link_retention === 'expiring') return 1;
         return 2;
       };
       safeUrls = [...safeUrls].sort((a, b) => {
@@ -190,8 +203,12 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { original_url, custom_code, type = 'url', text_content, code_id } = body;
+    const { original_url, custom_code, type = 'url', text_content, code_id, expire_duration } = body;
     const code = custom_code?.trim();
+
+    if (type !== 'url' && type !== 'text') {
+      return NextResponse.json({ success: false, message: '유효하지 않은 타입입니다.' }, { status: 400 });
+    }
 
     if (!code || (type === 'url' && !original_url) || (type === 'text' && (!text_content || !text_content.trim()))) {
       return NextResponse.json({ success: false, message: '필수 항목을 입력해주세요.' }, { status: 400 });
@@ -204,39 +221,54 @@ export async function POST(request) {
       );
     }
 
-    const picked = pickUserCode(user, code_id);
-    if (!picked.ok) {
-      return NextResponse.json({ success: false, message: picked.message }, { status: picked.status });
+    const scope = resolveLinkScope(user, code_id);
+    if (!scope.ok) {
+      return NextResponse.json({ success: false, message: scope.message }, { status: scope.status });
     }
-    const ownerCode = picked.code;
+    const isTemp = scope.temp;
+    const ownerCode = scope.code;
 
     const supabase = getSupabaseAdmin();
 
-    const { data: existing } = await supabase
+    let dupQuery = supabase
       .from('short_urls')
-      .select('id')
-      .eq('code', code)
-      .eq('user_code_id', ownerCode.id)
-      .maybeSingle();
+      .select('id, expiration_date, user_id, type, file_path')
+      .eq('code', code);
+    dupQuery = isTemp ? dupQuery.is('user_id', null) : dupQuery.eq('user_code_id', ownerCode.id);
+    const { data: existing } = await dupQuery.maybeSingle();
 
     if (existing) {
-      return NextResponse.json(
-        { success: false, message: memberDuplicateCodeMessage() },
-        { status: 409 }
-      );
+      const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
+      if (!isTemp || !isExpired) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: isTemp ? guestDuplicateCodeMessage(existing.expiration_date) : memberDuplicateCodeMessage(),
+            expiration_date: existing.expiration_date ?? null,
+          },
+          { status: 409 }
+        );
+      }
+      // 만료된 임시/비회원 코드는 정리 후 재사용
+      await deleteShortUrlWithFile(existing);
     }
 
-    const expirationDate = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
+    const expirationDate = isTemp
+      ? tempLinkExpirationIso(expire_duration, '1week')
+      : new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
 
     const insertData = {
       original_url: type === 'url' ? original_url : '__text__',
       code,
-      user_id: user.id,
-      user_code_id: ownerCode.id,
+      created_by_user_id: user.id,
       expiration_date: expirationDate,
       visits: 0,
       type,
     };
+    if (!isTemp) {
+      insertData.user_id = user.id;
+      insertData.user_code_id = ownerCode.id;
+    }
     if (type === 'text') {
       insertData.text_content = text_content;
     }
@@ -244,22 +276,30 @@ export async function POST(request) {
     const { error } = await supabase.from('short_urls').insert(insertData);
 
     if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json(
+          { success: false, message: isTemp ? guestDuplicateCodeMessage(null) : memberDuplicateCodeMessage() },
+          { status: 409 }
+        );
+      }
       console.error('URL create error:', error);
       return NextResponse.json({ success: false, message: 'URL 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    const shortUrl = buildShortUrl({ code, username: ownerCode.username });
+    const shortUrl = buildShortUrl({ code, username: isTemp ? undefined : ownerCode.username });
 
     return NextResponse.json({
       success: true,
-      message: 'URL이 성공적으로 생성되었습니다.',
+      message: isTemp ? '임시 단축 주소가 생성되었습니다.' : 'URL이 성공적으로 생성되었습니다.',
       data: {
         short_url: shortUrl,
         code,
         type,
         expiration_date: expirationDate,
-        username: ownerCode.username,
-        user_code_id: ownerCode.id,
+        username: isTemp ? null : ownerCode.username,
+        user_code_id: isTemp ? null : ownerCode.id,
+        is_temp: isTemp,
+        managed: true,
       },
     });
   } catch (error) {

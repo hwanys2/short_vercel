@@ -13,7 +13,7 @@ import {
   normalizeDisplayFileName,
   resolveAllowedMime,
 } from '@/lib/shortFiles';
-import { pickUserCode } from '@/lib/userCodes';
+import { resolveLinkScope } from '@/lib/userCodes';
 
 export const runtime = 'nodejs';
 
@@ -98,16 +98,23 @@ export async function POST(request) {
         .select('id, expiration_date, user_id')
         .eq('code', code);
 
+      let ownerCode = null;
       if (userId) {
-        const picked = pickUserCode(user, body.code_id);
-        if (!picked.ok) {
+        const scope = resolveLinkScope(user, body.code_id);
+        if (!scope.ok) {
           return NextResponse.json(
-            { status: 'error', message: picked.message },
-            { status: picked.status }
+            { status: 'error', message: scope.message },
+            { status: scope.status }
           );
         }
-        query = query.eq('user_code_id', picked.code.id);
+        ownerCode = scope.temp ? null : scope.code;
+      }
+      const isMemberPermanent = Boolean(userId && ownerCode);
+
+      if (isMemberPermanent) {
+        query = query.eq('user_code_id', ownerCode.id);
       } else {
+        // 비회원 또는 회원 임시 주소: 공용 네임스페이스에서 중복 검사
         query = query.is('user_id', null);
       }
 
@@ -116,7 +123,7 @@ export async function POST(request) {
       if (existing) {
         const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
         if (!isExpired) {
-          const message = userId
+          const message = isMemberPermanent
             ? memberDuplicateCodeMessage()
             : guestDuplicateCodeMessage(existing.expiration_date);
           return NextResponse.json(

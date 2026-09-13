@@ -2601,6 +2601,55 @@ a:hover {
   font-size: 0.85rem;
 }
 
+/* 임시 주소 결과 안내 */
+.result-temp-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.result-temp-note a {
+  color: #b45309;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 홈 폼: 내 코드 / 임시 주소 선택 안내 */
+.url-form-scope-hint {
+  margin: 8px 2px 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.url-form-scope-hint code {
+  font-size: 0.75rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(75, 90, 228, 0.08);
+  color: var(--text-secondary);
+}
+
+.url-form-scope-hint.is-temp {
+  color: #b45309;
+}
+
+.url-form-scope-hint.is-temp code {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+}
+
+select.form-input.is-temp {
+  border-color: rgba(245, 158, 11, 0.55);
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
 /* ============ Stats ============ */
 .stats-row {
   display: grid;
@@ -3598,6 +3647,12 @@ tr:hover td {
     justify-content: center;
   }
 
+  .url-code-select {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-md);
+  }
+
   .stats-row {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -3809,6 +3864,61 @@ tr:hover td {
 .dash-retention-badge.is-active {
   background: rgba(16, 185, 129, 0.12);
   color: #047857;
+}
+
+/* 대시보드: 임시 주소 표시 */
+.dash-scope-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  white-space: nowrap;
+}
+
+.dash-link-expiry {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.dash-link-expiry.is-expiring {
+  color: #b45309;
+}
+
+.dash-link-expiry.is-expired {
+  color: #ef4444;
+}
+
+.dash-chip.is-temp.is-active {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #b45309;
+}
+
+/* 대시보드 생성 폼: 임시 주소 만료 기간 */
+.dashboard-create-duration {
+  flex: 1 1 100%;
+  margin-bottom: 0;
+}
+
+.dashboard-create-duration .duration-options {
+  margin-top: 0;
+}
+
+.dashboard-create-duration-hint {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #b45309;
 }
 
 .dash-visits-cell {

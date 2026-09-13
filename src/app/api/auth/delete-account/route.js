@@ -25,10 +25,13 @@ export async function POST(request) {
 
     const admin = getSupabaseAdmin();
 
+    // 본인 코드 링크(user_id) + 임시 주소(created_by_user_id) 모두 정리
+    const ownerFilter = `user_id.eq.${user.id},created_by_user_id.eq.${user.id}`;
+
     const { data: fileRows } = await admin
       .from('short_urls')
       .select('file_path')
-      .eq('user_id', user.id)
+      .or(ownerFilter)
       .eq('type', 'file')
       .not('file_path', 'is', null);
 
@@ -37,7 +40,7 @@ export async function POST(request) {
       await deleteShortFiles(paths);
     }
 
-    await admin.from('short_urls').delete().eq('user_id', user.id);
+    await admin.from('short_urls').delete().or(ownerFilter);
 
     const authUserId = user.auth_user_id || user.authUserId || null;
 

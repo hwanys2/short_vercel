@@ -18,10 +18,15 @@ import {
   uploadShortFile,
   validateUploadFile,
 } from '@/lib/shortFiles';
-import { pickUserCode } from '@/lib/userCodes';
+import { resolveLinkScope } from '@/lib/userCodes';
+import { tempLinkDurationMs } from '@/lib/tempLinks';
 
 export const runtime = 'nodejs';
 
+/**
+ * 파일 링크 만료일. userId 는 "회원 본인 코드(영구) 링크"일 때만 전달한다.
+ * 회원 임시 주소는 비회원과 동일 규칙(선택 기간)을 따른다.
+ */
 function calculateFileExpirationDate({ userId, expireDuration, fileSize }) {
   const size = Number(fileSize) || 0;
 
@@ -41,15 +46,20 @@ function calculateFileExpirationDate({ userId, expireDuration, fileSize }) {
     return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  // 비회원은 선택한 만료 기간 적용 (기본 1개월/30일)
-  const durations = {
-    '24h': 24 * 60 * 60 * 1000,
-    '48h': 48 * 60 * 60 * 1000,
-    '1week': 7 * 24 * 60 * 60 * 1000,
-    '1month': 30 * 24 * 60 * 60 * 1000,
-  };
-  const duration = durations[expireDuration] || 30 * 24 * 60 * 60 * 1000;
-  return new Date(Date.now() + duration).toISOString();
+  // 비회원·회원 임시 주소는 선택한 만료 기간 적용 (기본 1개월/30일)
+  return new Date(Date.now() + tempLinkDurationMs(expireDuration, '1month')).toISOString();
+}
+
+/** 응답/삽입 공통: 스코프에 따른 소유 컬럼 */
+function applyOwnerColumns(insertData, { userId, ownerCode, isTemp }) {
+  if (userId && ownerCode && !isTemp) {
+    insertData.user_id = userId;
+    insertData.user_code_id = ownerCode.id;
+    insertData.created_by_user_id = userId;
+  } else if (userId && isTemp) {
+    insertData.created_by_user_id = userId;
+  }
+  return insertData;
 }
 
 export async function POST(request) {
@@ -61,10 +71,9 @@ export async function POST(request) {
   try {
     const user = await requireAppUser(request);
     const userId = user?.id || null;
+    // code_id는 JSON/FormData에서 각각 읽음 — 아래에서 설정 ('temp' 면 임시 주소)
     let ownerCode = null;
-    if (userId) {
-      // code_id는 JSON/FormData에서 각각 읽음 — 아래에서 설정
-    }
+    let isTemp = false;
     const supabase = getSupabaseAdmin();
 
     // ========================================================
@@ -80,15 +89,17 @@ export async function POST(request) {
       }
 
       if (userId) {
-        const picked = pickUserCode(user, body.code_id);
-        if (!picked.ok) {
+        const scope = resolveLinkScope(user, body.code_id);
+        if (!scope.ok) {
           return NextResponse.json(
-            { status: 'error', message: picked.message },
-            { status: picked.status }
+            { status: 'error', message: scope.message },
+            { status: scope.status }
           );
         }
-        ownerCode = picked.code;
+        isTemp = scope.temp;
+        ownerCode = scope.code;
       }
+      const isMemberPermanent = Boolean(userId && ownerCode && !isTemp);
 
       const {
         key,
@@ -135,7 +146,7 @@ export async function POST(request) {
         .select('id, expiration_date, user_id, type, file_path')
         .eq('code', code);
 
-      if (userId && ownerCode) {
+      if (isMemberPermanent) {
         query = query.eq('user_code_id', ownerCode.id);
       } else {
         query = query.is('user_id', null);
@@ -146,7 +157,7 @@ export async function POST(request) {
       if (existing) {
         const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
         if (!isExpired) {
-          const message = userId
+          const message = isMemberPermanent
             ? memberDuplicateCodeMessage()
             : guestDuplicateCodeMessage(existing.expiration_date);
           return NextResponse.json(
@@ -161,24 +172,26 @@ export async function POST(request) {
         await deleteShortUrlWithFile(existing);
       }
 
-      const expirationDate = calculateFileExpirationDate({ userId, expireDuration, fileSize });
+      const expirationDate = calculateFileExpirationDate({
+        userId: isMemberPermanent ? userId : null,
+        expireDuration,
+        fileSize,
+      });
 
-      const insertData = {
-        original_url: publicUrl || key,
-        code,
-        expiration_date: expirationDate,
-        visits: 0,
-        type: 'file',
-        file_path: key,
-        file_name: fileName || 'file',
-        file_size: Number(fileSize) || 0,
-        file_mime: fileMime || 'application/octet-stream',
-      };
-
-      if (userId && ownerCode) {
-        insertData.user_id = userId;
-        insertData.user_code_id = ownerCode.id;
-      }
+      const insertData = applyOwnerColumns(
+        {
+          original_url: publicUrl || key,
+          code,
+          expiration_date: expirationDate,
+          visits: 0,
+          type: 'file',
+          file_path: key,
+          file_name: fileName || 'file',
+          file_size: Number(fileSize) || 0,
+          file_mime: fileMime || 'application/octet-stream',
+        },
+        { userId, ownerCode, isTemp }
+      );
 
       if (linkPasswordEnabled) {
         const rawPwd = typeof linkPassword === 'string' ? linkPassword.trim() : '';
@@ -207,7 +220,7 @@ export async function POST(request) {
 
       const shortUrl = buildShortUrl({
         code,
-        username: ownerCode ? ownerCode.username : undefined,
+        username: isMemberPermanent ? ownerCode.username : undefined,
       });
 
       return NextResponse.json(
@@ -222,8 +235,10 @@ export async function POST(request) {
             type: 'file',
             file_name: fileName,
             file_size: fileSize,
-            username: ownerCode?.username || null,
-            user_code_id: ownerCode?.id || null,
+            username: isMemberPermanent ? ownerCode.username : null,
+            user_code_id: isMemberPermanent ? ownerCode.id : null,
+            is_temp: Boolean(userId && isTemp),
+            managed: Boolean(userId),
           },
         },
         { status: 201 }
@@ -243,15 +258,17 @@ export async function POST(request) {
     const formCodeId = form.get('code_id');
 
     if (userId) {
-      const picked = pickUserCode(user, formCodeId);
-      if (!picked.ok) {
+      const scope = resolveLinkScope(user, formCodeId);
+      if (!scope.ok) {
         return NextResponse.json(
-          { status: 'error', message: picked.message },
-          { status: picked.status }
+          { status: 'error', message: scope.message },
+          { status: scope.status }
         );
       }
-      ownerCode = picked.code;
+      isTemp = scope.temp;
+      ownerCode = scope.code;
     }
+    const isMemberPermanent = Boolean(userId && ownerCode && !isTemp);
 
     if (!file || typeof file === 'string') {
       return NextResponse.json(
@@ -294,7 +311,7 @@ export async function POST(request) {
       .select('id, expiration_date, user_id, type, file_path')
       .eq('code', code);
 
-    if (userId && ownerCode) {
+    if (isMemberPermanent) {
       query = query.eq('user_code_id', ownerCode.id);
     } else {
       query = query.is('user_id', null);
@@ -305,7 +322,7 @@ export async function POST(request) {
     if (existing) {
       const isExpired = existing.expiration_date && new Date(existing.expiration_date) < new Date();
       if (!isExpired) {
-        const message = userId
+        const message = isMemberPermanent
           ? memberDuplicateCodeMessage()
           : guestDuplicateCodeMessage(existing.expiration_date);
         return NextResponse.json(
@@ -320,28 +337,30 @@ export async function POST(request) {
       await deleteShortUrlWithFile(existing);
     }
 
-    const expirationDate = calculateFileExpirationDate({ userId, expireDuration, fileSize: validated.fileSize });
+    const expirationDate = calculateFileExpirationDate({
+      userId: isMemberPermanent ? userId : null,
+      expireDuration,
+      fileSize: validated.fileSize,
+    });
 
     const storagePath = buildStoragePath({ userId, fileName: validated.fileName });
     await uploadShortFile({ file, path: storagePath, mime: validated.mime });
     uploadedPath = storagePath;
 
-    const insertData = {
-      original_url: '__file__',
-      code,
-      expiration_date: expirationDate,
-      visits: 0,
-      type: 'file',
-      file_path: storagePath,
-      file_name: validated.fileName,
-      file_size: validated.fileSize,
-      file_mime: validated.mime,
-    };
-
-    if (userId && ownerCode) {
-      insertData.user_id = userId;
-      insertData.user_code_id = ownerCode.id;
-    }
+    const insertData = applyOwnerColumns(
+      {
+        original_url: '__file__',
+        code,
+        expiration_date: expirationDate,
+        visits: 0,
+        type: 'file',
+        file_path: storagePath,
+        file_name: validated.fileName,
+        file_size: validated.fileSize,
+        file_mime: validated.mime,
+      },
+      { userId, ownerCode, isTemp }
+    );
 
     if (linkPasswordEnabled) {
       const rawPwd = linkPassword.trim();
@@ -370,7 +389,7 @@ export async function POST(request) {
 
     const shortUrl = buildShortUrl({
       code,
-      username: ownerCode ? ownerCode.username : undefined,
+      username: isMemberPermanent ? ownerCode.username : undefined,
     });
 
     return NextResponse.json(
@@ -385,8 +404,10 @@ export async function POST(request) {
           type: 'file',
           file_name: validated.fileName,
           file_size: validated.fileSize,
-          username: ownerCode?.username || null,
-          user_code_id: ownerCode?.id || null,
+          username: isMemberPermanent ? ownerCode.username : null,
+          user_code_id: isMemberPermanent ? ownerCode.id : null,
+          is_temp: Boolean(userId && isTemp),
+          managed: Boolean(userId),
         },
       },
       { status: 201 }

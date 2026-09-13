@@ -9,6 +9,8 @@ import {
   getFileCapacityRetentionInfo,
 } from '@/lib/shortFilesShared';
 import { uploadShortFileAuto } from '@/lib/fileUploadClient';
+import { useLinkScope, parseScopeSelectValue } from '@/lib/useLinkScope';
+import { TEMP_SCOPE, TEMP_LINK_DURATION_OPTIONS } from '@/lib/tempLinks';
 
 export default function UrlForm({ user, onResult }) {
   const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'
@@ -23,42 +25,20 @@ export default function UrlForm({ user, onResult }) {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState('');
-  const [selectedCodeId, setSelectedCodeId] = useState(null);
   const abortControllerRef = useRef(null);
 
-  const userCodes = user?.codes || [];
-  const hasMultipleCodes = userCodes.length > 1;
-
-  useEffect(() => {
-    if (!user) {
-      setSelectedCodeId(null);
-      return;
-    }
-    const codes = user.codes || [];
-    const primaryId = user.primary_code_id || codes.find((c) => c.is_primary)?.id || codes[0]?.id || null;
-    let saved = null;
-    try {
-      saved = localStorage.getItem(`short_create_code_id_${user.id}`);
-    } catch {}
-    const savedNum = saved != null ? Number(saved) : null;
-    const validSaved = codes.some((c) => Number(c.id) === savedNum) ? savedNum : null;
-    setSelectedCodeId(validSaved || primaryId);
-  }, [user]);
-
-  const activeCode =
-    userCodes.find((c) => Number(c.id) === Number(selectedCodeId)) ||
-    userCodes.find((c) => c.is_primary) ||
-    userCodes[0];
-  const activeUsername = activeCode?.username || user?.username;
-
-  const setSelectedCodeIdPersist = (id) => {
-    setSelectedCodeId(id);
-    if (user?.id) {
-      try {
-        localStorage.setItem(`short_create_code_id_${user.id}`, String(id));
-      } catch {}
-    }
-  };
+  // 로그인 사용자: 본인 코드(영구) 또는 임시 주소(숏.한국/코드) 선택
+  const {
+    scope: selectedScope,
+    isTemp,
+    codes: userCodes,
+    activeUsername,
+    setScope: setSelectedScope,
+    selectValue: scopeSelectValue,
+  } = useLinkScope(user);
+  const isLoggedIn = Boolean(user?.id);
+  /** 본인 코드로 영구 링크를 만드는 경우 */
+  const isMemberPermanent = isLoggedIn && !isTemp;
 
   // 업로드 도중 사용자가 실수로 탭을 닫거나 새로고침하는 것을 방지
   useEffect(() => {
@@ -81,7 +61,7 @@ export default function UrlForm({ user, onResult }) {
   };
 
   const baseUrl = '숏.한국/';
-  const prefix = user ? `${baseUrl}${activeUsername}/` : baseUrl;
+  const prefix = isMemberPermanent ? `${baseUrl}${activeUsername}/` : baseUrl;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,7 +99,7 @@ export default function UrlForm({ user, onResult }) {
         const result = await uploadShortFileAuto({
           file,
           customCode: customCode.trim(),
-          codeId: selectedCodeId,
+          codeId: isLoggedIn ? selectedScope : null,
           expireDuration,
           linkPasswordEnabled: passwordProtect,
           linkPassword: passwordProtect ? linkPassword.trim() : '',
@@ -146,7 +126,7 @@ export default function UrlForm({ user, onResult }) {
         expire_duration: expireDuration,
         type: mode,
       };
-      if (selectedCodeId != null) body.code_id = selectedCodeId;
+      if (isLoggedIn && selectedScope != null) body.code_id = selectedScope;
 
       if (mode === 'url') {
         body.original_url = originalUrl;
@@ -237,12 +217,7 @@ export default function UrlForm({ user, onResult }) {
   const isSmallFile = isFileMode && Boolean(file && file.size <= 10 * 1024 * 1024);
   const isR2File = isLargeR2 || isNormalR2 || isSmallFile;
 
-  let durationOptions = [
-    { value: '24h', label: '24시간' },
-    { value: '48h', label: '48시간' },
-    { value: '1week', label: '1주일' },
-    { value: '1month', label: '1개월 (30일)' },
-  ];
+  let durationOptions = [...TEMP_LINK_DURATION_OPTIONS];
 
   if (isLargeR2) {
     // 1GB 초과 파일: 딱 2일(48시간)만 가능
@@ -260,6 +235,8 @@ export default function UrlForm({ user, onResult }) {
     mode === 'file'
       ? '파일 공유는 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과 2일간 보관 후 자동 삭제됩니다 (주소는 영구 유지)'
       : `회원 ${mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다`;
+
+  const showDurationPicker = !isMemberPermanent || isR2File;
 
   return (
     <div className="url-form-container">
@@ -359,7 +336,7 @@ export default function UrlForm({ user, onResult }) {
 
               {/* 선택된 파일 상세 정보 및 용량별 자동 삭제 안내 배너 */}
               {file && (() => {
-                const info = getFileCapacityRetentionInfo(file.size, Boolean(user));
+                const info = getFileCapacityRetentionInfo(file.size, isMemberPermanent);
                 return (
                   <div
                     style={{
@@ -390,7 +367,7 @@ export default function UrlForm({ user, onResult }) {
                 <br />
                 스토리지 자원 관리를 위해 10MB 이하는 30일, 10MB~1GB는 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
                 {' '}
-                {user ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
+                {isMemberPermanent ? FILE_SHARE_NOTICE_MEMBER : FILE_SHARE_NOTICE_GUEST}
               </p>
             </>
           )}
@@ -399,18 +376,19 @@ export default function UrlForm({ user, onResult }) {
         <div className="form-group">
           <label className="form-label" htmlFor="custom-code">단축 코드</label>
           <div className="code-input-group">
-            {hasMultipleCodes ? (
+            {isLoggedIn ? (
               <select
-                className="form-input url-code-select"
-                aria-label="본인 코드 선택"
-                value={selectedCodeId ?? ''}
-                onChange={(e) => setSelectedCodeIdPersist(Number(e.target.value))}
+                className={`form-input url-code-select${isTemp ? ' is-temp' : ''}`}
+                aria-label="주소 형태 선택 (내 코드 또는 임시 주소)"
+                value={scopeSelectValue}
+                onChange={(e) => setSelectedScope(parseScopeSelectValue(e.target.value))}
               >
                 {userCodes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {baseUrl}{c.username}/
                   </option>
                 ))}
+                <option value={TEMP_SCOPE}>{baseUrl} (임시)</option>
               </select>
             ) : (
               <span className="url-prefix">{prefix}</span>
@@ -427,6 +405,21 @@ export default function UrlForm({ user, onResult }) {
               title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
             />
           </div>
+          {isLoggedIn && (
+            <p className={`url-form-scope-hint${isTemp ? ' is-temp' : ''}`}>
+              {isTemp ? (
+                <>
+                  ⏳ <strong>임시 주소</strong> — 내 코드 없이 <code>{baseUrl}코드</code> 형태로 만들어져요. 선택한 기간이
+                  지나면 자동 삭제되며, 만료 전까지 대시보드에서 수정·삭제·연장할 수 있습니다.
+                </>
+              ) : (
+                <>
+                  ✨ <strong>내 코드 주소</strong> — <code>{baseUrl}{activeUsername}/코드</code> 형태의 영구 주소예요.
+                  짧은 임시 주소가 필요하면 위에서 <em>{baseUrl} (임시)</em>를 선택하세요.
+                </>
+              )}
+            </p>
+          )}
         </div>
 
         <div className="url-form-member-options">
@@ -499,7 +492,7 @@ export default function UrlForm({ user, onResult }) {
         </div>
 
         {/* 만료 기간 (또는 회원 영구 배지) */}
-        {user && !isR2File ? (
+        {!showDurationPicker ? (
           <div className="form-group" style={{ textAlign: 'center' }}>
             <div className="member-badge">
               ✨ {memberBadgeText}
@@ -509,7 +502,7 @@ export default function UrlForm({ user, onResult }) {
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <label className="form-label" style={{ marginBottom: 0 }}>
-                {isR2File ? '만료 기간 (파일 저장 기간에 맞춰 자동 지정)' : '만료 기간'}
+                {isR2File ? '만료 기간 (파일 저장 기간에 맞춰 자동 지정)' : isTemp ? '임시 주소 만료 기간' : '만료 기간'}
               </label>
               {isR2File && (
                 <span
@@ -551,6 +544,11 @@ export default function UrlForm({ user, onResult }) {
             {isSmallFile && (
               <p style={{ fontSize: '0.8rem', color: '#2563eb', marginTop: '6px', lineHeight: '1.4' }}>
                 📄 10MB 이하 일반 파일은 기본 <strong>30일간 보관</strong>되며 원하시는 만료 기간을 선택할 수 있습니다.
+              </p>
+            )}
+            {isTemp && !isFileMode && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: '1.4' }}>
+                ⏳ 임시 주소는 모든 사용자가 함께 쓰는 공간이라 만료 기간이 있어요. 만료 전 대시보드에서 기간을 다시 설정하거나 내 코드 주소로 전환할 수 있습니다.
               </p>
             )}
           </div>
@@ -617,11 +615,11 @@ export default function UrlForm({ user, onResult }) {
           {loading ? (
             <><span className="spinner" /> {uploadProgress?.statusText || '처리 중...'}</>
           ) : mode === 'url' ? (
-            <>🔗 URL 단축하기</>
+            <>🔗 {isTemp ? '임시 주소로 단축하기' : 'URL 단축하기'}</>
           ) : mode === 'text' ? (
-            <>📋 단축 주소 만들기</>
+            <>📋 {isTemp ? '임시 단축 주소 만들기' : '단축 주소 만들기'}</>
           ) : (
-            <>📎 파일 공유 주소 만들기</>
+            <>📎 {isTemp ? '임시 파일 공유 주소 만들기' : '파일 공유 주소 만들기'}</>
           )}
         </button>
         {!user && (
