@@ -261,22 +261,6 @@ export default function Header() {
             </div>
             {loading ? null : user ? (
               <>
-                {user.is_admin && (
-                  <>
-                    <Link
-                      href="/admin/slots"
-                      className="nav-text-link nav-desktop-only"
-                    >
-                      슬롯 관리
-                    </Link>
-                    <Link
-                      href="/admin/mailing"
-                      className="nav-text-link nav-desktop-only"
-                    >
-                      메일 발송
-                    </Link>
-                  </>
-                )}
                 <Link
                   href={user.needsOnboarding ? '/onboarding' : '/dashboard'}
                   className="nav-text-link nav-desktop-only"
