@@ -279,7 +279,7 @@ export default function ProfilePage() {
               <div className="profile-panel-head">
                 <h2>본인 코드</h2>
                 <p>
-                  단축 주소의 앞부분입니다. 기본 {maxCodes}개까지 가질 수 있습니다.
+                  단축 주소의 앞부분입니다. 최대 {maxCodes}개까지 가질 수 있습니다.
                 </p>
               </div>
               <div className="profile-panel-body">
