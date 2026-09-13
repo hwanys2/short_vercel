@@ -16,9 +16,11 @@
   --bg-elevated: #eef1ff;
   --bg-card: #ffffff;
   --bg-card-hover: #f7f9ff;
+  --bg-secondary: #f1f4ff;
   --surface: #f1f4ff;
   --border: rgba(73, 85, 126, 0.16);
   --border-light: rgba(73, 85, 126, 0.24);
+  --border-color: rgba(73, 85, 126, 0.16);
 
   /* Text */
   --text: #1f2344;
@@ -75,9 +77,11 @@
   --bg-elevated: #1a1a2e;
   --bg-card: #1e1e32;
   --bg-card-hover: #252540;
+  --bg-secondary: #252540;
   --surface: #2a2a45;
   --border: rgba(255, 255, 255, 0.08);
   --border-light: rgba(255, 255, 255, 0.12);
+  --border-color: rgba(255, 255, 255, 0.08);
 
   --text: #f0f0f5;
   --text-secondary: #a0a0b8;
@@ -899,9 +903,14 @@ a:hover {
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 14px;
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg-secondary, #f8fafc);
+  background: var(--surface);
+  transition: var(--transition);
+}
+
+.profile-code-row:hover {
+  border-color: var(--border-light);
 }
 
 .profile-code-main {
@@ -919,6 +928,7 @@ a:hover {
 .profile-code-name {
   font-weight: 700;
   font-size: 1rem;
+  color: var(--text);
   word-break: break-all;
 }
 
@@ -927,19 +937,27 @@ a:hover {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(100, 116, 139, 0.12);
-  color: var(--text-muted, #64748b);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
 }
 
 .profile-code-badge.is-primary {
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
+  background: rgba(94, 105, 235, 0.15);
+  border: 1px solid rgba(94, 105, 235, 0.35);
+  color: var(--primary);
+}
+
+[data-theme='dark'] .profile-code-badge.is-primary {
+  background: rgba(99, 102, 241, 0.25);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  color: #818cf8;
 }
 
 .profile-code-meta {
   margin-top: 4px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
   line-height: 1.4;
   word-break: break-all;
 }

@@ -372,11 +372,11 @@ function EditUrlPageInner() {
                   {isFile && (() => {
                     const isExpired = expirationDate && new Date(expirationDate) <= new Date();
                     return (
-                      <div className="form-group" style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                      <div className="form-group" style={{ background: 'var(--surface)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border)' }}>
                         <label className="form-label" style={{ fontWeight: 600, fontSize: '0.95rem' }}>공유 파일 정보</label>
 
                         {/* 현재 등록된 파일 상태 카드 */}
-                        <div style={{ padding: '12px 14px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+                        <div style={{ padding: '12px 14px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '14px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                             <span style={{ fontWeight: 600, wordBreak: 'break-all' }}>📁 {fileName || '파일'}</span>
                             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -603,7 +603,7 @@ function EditUrlPageInner() {
 
                   {/* 파일 업로드 진행률 바 */}
                   {uploadProgress && (
-                    <div style={{ margin: '16px 0', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ margin: '16px 0', padding: '12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
                         <span>{uploadProgress.statusText}</span>
                         <span style={{ color: '#2563eb' }}>{uploadProgress.percent}%</span>

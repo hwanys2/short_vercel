@@ -216,7 +216,7 @@ export default function AdminSlotsPage() {
               <span
                 style={{
                   background: 'var(--bg-card, #fff)',
-                  border: '1px solid var(--border-color, #e5e7eb)',
+                  border: '1px solid var(--border)',
                   borderRadius: 20,
                   padding: '2px 10px',
                   fontSize: '0.8rem',
@@ -234,7 +234,7 @@ export default function AdminSlotsPage() {
           </div>
 
           {/* 관리자 서브 탭 바로가기 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border-color, #e5e7eb)', paddingBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
             <Link href="/admin/slots" className="btn btn-sm btn-primary">
               코드 슬롯 관리
             </Link>
@@ -360,8 +360,9 @@ export default function AdminSlotsPage() {
                                   <span
                                     key={c.id}
                                     style={{
-                                      background: c.is_primary ? 'var(--primary, #3b82f6)' : 'var(--bg-secondary, #f3f4f6)',
-                                      color: c.is_primary ? '#fff' : 'inherit',
+                                      background: c.is_primary ? 'var(--primary, #3b82f6)' : 'var(--surface)',
+                                      color: c.is_primary ? '#fff' : 'var(--text)',
+                                      border: c.is_primary ? 'none' : '1px solid var(--border)',
                                       padding: '3px 8px',
                                       borderRadius: 6,
                                       fontSize: '0.8rem',
@@ -384,7 +385,8 @@ export default function AdminSlotsPage() {
                         {/* 오른쪽: 슬롯 개수 변경 컨트롤 */}
                         <div
                           style={{
-                            background: 'var(--bg-secondary, #f9fafb)',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--border)',
                             padding: '12px 16px',
                             borderRadius: 8,
                             display: 'flex',
@@ -394,9 +396,9 @@ export default function AdminSlotsPage() {
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>슬롯 한도 설정:</span>
-                            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                              현재: <strong>{user.max_codes}개</strong>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>슬롯 한도 설정:</span>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                              현재: <strong style={{ color: 'var(--text)' }}>{user.max_codes}개</strong>
                             </span>
                           </div>
 
@@ -411,7 +413,7 @@ export default function AdminSlotsPage() {
                               style={{ width: 80, padding: '6px 10px', textAlign: 'center', fontWeight: 700 }}
                               disabled={isUpdating}
                             />
-                            <span style={{ fontSize: '0.85rem' }}>개</span>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text)' }}>개</span>
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
