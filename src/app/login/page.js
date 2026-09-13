@@ -15,7 +15,7 @@ const ERROR_MESSAGES = {
     '이 이메일은 이미 다른 계정에 연결되어 있습니다. 기존 방식으로 로그인해 주세요.',
   link_failed: '계정 연동에 실패했습니다. 잠시 후 다시 시도해주세요.',
   already_registered:
-    '이미 가입된 이메일입니다. 아래 로그인(비밀번호 또는 Google)으로 들어와 주세요.',
+    '이미 가입된 이메일입니다. Google 또는 기존 아이디(비밀번호)로 로그인해 주세요.',
 };
 
 function LoginForm() {
@@ -79,6 +79,27 @@ function LoginForm() {
           </div>
           <div className="auth-body">
             {error && <div className="alert alert-danger">⚠️ {error}</div>}
+
+            <GoogleSignInButton
+              label="Google 계정으로 로그인"
+              disabled={loading}
+              style={{ marginTop: 0 }}
+            />
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                margin: '24px 0 20px',
+                color: 'var(--text-muted)',
+                fontSize: '0.85rem',
+              }}
+            >
+              <div style={{ flex: 1, height: 1, background: 'var(--border, #ddd)' }} />
+              또는 아이디로 로그인
+              <div style={{ flex: 1, height: 1, background: 'var(--border, #ddd)' }} />
+            </div>
 
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -150,27 +171,10 @@ function LoginForm() {
                     <span className="spinner" /> 로그인 중...
                   </>
                 ) : (
-                  '로그인'
+                  '아이디로 로그인'
                 )}
               </button>
             </form>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                margin: '20px 0 8px',
-                color: 'var(--text-muted)',
-                fontSize: '0.85rem',
-              }}
-            >
-              <div style={{ flex: 1, height: 1, background: 'var(--border-color, #ddd)' }} />
-              또는
-              <div style={{ flex: 1, height: 1, background: 'var(--border-color, #ddd)' }} />
-            </div>
-
-            <GoogleSignInButton disabled={loading} />
 
             <div className="auth-option">
               계정이 없으신가요? <Link href="/register">회원가입</Link>

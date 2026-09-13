@@ -1091,6 +1091,21 @@ a:hover {
   color: var(--text);
 }
 
+.btn-google {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  border-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+}
+
 .btn-danger {
   background: rgba(239, 68, 68, 0.15);
   color: var(--danger);

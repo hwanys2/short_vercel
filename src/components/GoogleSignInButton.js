@@ -12,6 +12,8 @@ export default function GoogleSignInButton({
   label = 'Google로 계속하기',
   disabled = false,
   intent = 'login',
+  style = {},
+  className = '',
 }) {
   const handleClick = async () => {
     try {
@@ -40,7 +42,7 @@ export default function GoogleSignInButton({
   return (
     <button
       type="button"
-      className="btn"
+      className={`btn btn-google ${className}`.trim()}
       onClick={handleClick}
       disabled={disabled}
       style={{
@@ -50,10 +52,8 @@ export default function GoogleSignInButton({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '10px',
-        background: 'var(--bg-secondary, #fff)',
-        border: '1px solid var(--border-color, #ddd)',
-        color: 'var(--text-primary, #222)',
-        fontWeight: 500,
+        fontWeight: 600,
+        ...style,
       }}
     >
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
