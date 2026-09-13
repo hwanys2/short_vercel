@@ -86,6 +86,7 @@ export function uploadToR2WithProgress(presignedUrl, file, onProgress, mimeType,
 export async function uploadFileToR2Only({
   file,
   customCode = '',
+  codeId = null,
   onProgress,
   signal,
   isEdit = false,
@@ -99,16 +100,19 @@ export async function uploadFileToR2Only({
     });
   }
 
+  const presignBody = {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type || 'application/octet-stream',
+    customCode: customCode.trim(),
+    isEdit: Boolean(isEdit),
+  };
+  if (codeId != null) presignBody.code_id = codeId;
+
   const presignRes = await fetch('/api/upload/r2-presign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type || 'application/octet-stream',
-      customCode: customCode.trim(),
-      isEdit: Boolean(isEdit),
-    }),
+    body: JSON.stringify(presignBody),
     signal,
   });
 
@@ -159,6 +163,7 @@ export async function uploadFileToR2Only({
 export async function uploadShortFileAuto({
   file,
   customCode,
+  codeId = null,
   expireDuration = '1month',
   linkPasswordEnabled = false,
   linkPassword = '',
@@ -168,6 +173,7 @@ export async function uploadShortFileAuto({
   const uploaded = await uploadFileToR2Only({
     file,
     customCode,
+    codeId,
     onProgress,
     signal,
     isEdit: false,
@@ -182,20 +188,23 @@ export async function uploadShortFileAuto({
     });
   }
 
+  const completeBody = {
+    key: uploaded.key,
+    publicUrl: uploaded.publicUrl,
+    fileName: uploaded.fileName,
+    fileSize: uploaded.fileSize,
+    fileMime: uploaded.fileMime,
+    customCode: customCode.trim(),
+    expireDuration,
+    linkPasswordEnabled,
+    linkPassword: linkPasswordEnabled ? linkPassword.trim() : '',
+  };
+  if (codeId != null) completeBody.code_id = codeId;
+
   const completeRes = await fetch('/api/shorten-file', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      key: uploaded.key,
-      publicUrl: uploaded.publicUrl,
-      fileName: uploaded.fileName,
-      fileSize: uploaded.fileSize,
-      fileMime: uploaded.fileMime,
-      customCode: customCode.trim(),
-      expireDuration,
-      linkPasswordEnabled,
-      linkPassword: linkPasswordEnabled ? linkPassword.trim() : '',
-    }),
+    body: JSON.stringify(completeBody),
     signal,
   });
 

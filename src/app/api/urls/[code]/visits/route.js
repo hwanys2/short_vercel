@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
+import { pickUserCode } from '@/lib/userCodes';
 
 function decodeCodeParam(code) {
   try {
@@ -27,7 +28,6 @@ function addDaysKst(dateStr, days) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const utc = Date.UTC(y, m - 1, d) + days * 24 * 60 * 60 * 1000;
   const dt = new Date(utc);
-  // format as KST calendar via fixed +9 offset from that UTC midnight of the calendar day
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'UTC',
     year: 'numeric',
@@ -52,13 +52,17 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const daysRaw = parseInt(searchParams.get('days') || '30', 10);
     const days = [7, 30].includes(daysRaw) ? daysRaw : 30;
+    const scoped = pickUserCode(user, searchParams.get('code_id'));
+    if (!scoped.ok) {
+      return NextResponse.json({ success: false, message: scoped.message }, { status: scoped.status });
+    }
 
     const supabase = getSupabaseAdmin();
     const { data: row, error } = await supabase
       .from('short_urls')
       .select('id, code, visits')
       .eq('code', code)
-      .eq('user_id', user.id)
+      .eq('user_code_id', scoped.code.id)
       .maybeSingle();
 
     if (error) throw error;

@@ -6,16 +6,23 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ChangeUsernameModal from '@/components/ChangeUsernameModal';
+import AddUserCodeModal from '@/components/AddUserCodeModal';
 import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [codes, setCodes] = useState([]);
+  const [maxCodes, setMaxCodes] = useState(2);
+  const [canAddCode, setCanAddCode] = useState(false);
+  const [codesLoading, setCodesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
 
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [editingCode, setEditingCode] = useState(null);
+  const [showAddCodeModal, setShowAddCodeModal] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -30,6 +37,23 @@ export default function ProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
+
+  const loadCodes = async () => {
+    setCodesLoading(true);
+    try {
+      const res = await fetch('/api/profile/codes');
+      const data = await res.json();
+      if (data.success) {
+        setCodes(data.codes || []);
+        setMaxCodes(data.max_codes ?? 2);
+        setCanAddCode(Boolean(data.can_add_code));
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setCodesLoading(false);
+    }
+  };
 
   const loadMe = async () => {
     const res = await fetch('/api/auth/me');
@@ -49,6 +73,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadMe()
+      .then((u) => {
+        if (u) return loadCodes();
+        return null;
+      })
       .catch(() => router.push('/login'))
       .finally(() => setLoading(false));
   }, [router]);
@@ -56,6 +84,28 @@ export default function ProfilePage() {
   const flash = (text, type = 'success') => {
     setMessage(text);
     setMessageType(type);
+  };
+
+  const handleDeleteCode = async (code) => {
+    if (code.is_primary) return;
+    if (code.url_count > 0) {
+      alert('이 본인 코드 아래에 단축 주소가 있습니다. 링크를 모두 삭제하거나 다른 코드로 옮긴 뒤 삭제해주세요.');
+      return;
+    }
+    if (!confirm(`본인 코드 "${code.username}"을(를) 삭제할까요?`)) return;
+    try {
+      const res = await fetch(`/api/profile/codes/${code.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!data.success) {
+        flash(data.message || '삭제에 실패했습니다.', 'danger');
+        return;
+      }
+      flash('본인 코드가 삭제되었습니다.');
+      await loadCodes();
+      await loadMe();
+    } catch {
+      flash('네트워크 오류가 발생했습니다.', 'danger');
+    }
   };
 
   const handleChangePassword = async (e) => {
@@ -222,34 +272,85 @@ export default function ProfilePage() {
                     readOnly
                   />
                 </div>
-                <div className="profile-field">
-                  <div className="profile-label-row">
-                    <label className="profile-label" htmlFor="profile-username">
-                      본인 코드
-                    </label>
-                    {!user.can_change_username && user.username_change_remaining_label && (
-                      <span className="profile-hint">
-                        다음 변경까지 {user.username_change_remaining_label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="profile-inline">
-                    <input
-                      id="profile-username"
-                      className="form-input"
-                      value={user.username || ''}
-                      disabled
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setShowUsernameModal(true)}
-                    >
-                      변경
-                    </button>
-                  </div>
+              </div>
+            </section>
+
+            <section className="card profile-panel">
+              <div className="profile-panel-head">
+                <h2>본인 코드</h2>
+                <p>
+                  단축 주소의 앞부분입니다. 기본 {maxCodes}개까지 가질 수 있습니다.
+                </p>
+              </div>
+              <div className="profile-panel-body">
+                {codesLoading ? (
+                  <p className="profile-loading">불러오는 중...</p>
+                ) : (
+                  <ul className="profile-code-list">
+                    {codes.map((c) => (
+                      <li key={c.id} className="profile-code-row">
+                        <div className="profile-code-main">
+                          <div className="profile-code-title">
+                            <span className="profile-code-name">{c.username}</span>
+                            {c.is_primary ? (
+                              <span className="profile-code-badge is-primary">기본</span>
+                            ) : (
+                              <span className="profile-code-badge">추가</span>
+                            )}
+                          </div>
+                          <div className="profile-code-meta">
+                            {baseUrl}{c.username}/ · 링크 {c.url_count ?? 0}개
+                            {!c.can_change && c.remaining_label ? (
+                              <> · 변경까지 {c.remaining_label}</>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="profile-code-actions">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setEditingCode(c);
+                              setShowUsernameModal(true);
+                            }}
+                          >
+                            변경
+                          </button>
+                          {!c.is_primary && (
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-sm"
+                              disabled={(c.url_count || 0) > 0}
+                              title={
+                                (c.url_count || 0) > 0
+                                  ? '링크를 먼저 삭제하거나 다른 코드로 옮기세요'
+                                  : '본인 코드 삭제'
+                              }
+                              onClick={() => handleDeleteCode(c)}
+                            >
+                              삭제
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="profile-actions" style={{ marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!canAddCode}
+                    onClick={() => setShowAddCodeModal(true)}
+                  >
+                    코드 추가 ({codes.length}/{maxCodes})
+                  </button>
                 </div>
+                {!canAddCode && (
+                  <p className="profile-hint" style={{ marginTop: 8 }}>
+                    본인 코드 한도에 도달했습니다.
+                  </p>
+                )}
               </div>
             </section>
 
@@ -387,14 +488,32 @@ export default function ProfilePage() {
       <ChangeUsernameModal
         open={showUsernameModal}
         user={user}
+        code={editingCode}
         baseUrl={baseUrl}
-        onClose={() => setShowUsernameModal(false)}
+        onClose={() => {
+          setShowUsernameModal(false);
+          setEditingCode(null);
+        }}
         onChanged={(data) => {
-          const nextUsername = data?.user?.username || '';
+          const nextUsername = data?.code?.username || data?.user?.username || '';
           alert(
             `본인 코드가 ${nextUsername}(으)로 변경되었습니다.\n기존 단축 주소는 즉시 무효가 되며, 이전 코드는 다른 사람이 사용할 수 있습니다.`
           );
           window.location.assign('/profile');
+        }}
+      />
+
+      <AddUserCodeModal
+        open={showAddCodeModal}
+        baseUrl={baseUrl}
+        maxCodes={maxCodes}
+        currentCount={codes.length}
+        onClose={() => setShowAddCodeModal(false)}
+        onAdded={async (data) => {
+          setShowAddCodeModal(false);
+          flash(`본인 코드 "${data?.code?.username || ''}"가 추가되었습니다.`);
+          await loadCodes();
+          await loadMe();
         }}
       />
 

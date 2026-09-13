@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 import { formatFileSize } from '@/lib/shortFiles';
+import { resolveOwnerCode } from '@/lib/userCodes';
 
 async function loadFileRow(request) {
   const { searchParams } = new URL(request.url);
@@ -21,13 +22,9 @@ async function loadFileRow(request) {
 
   if (username) {
     const normalizedUsername = normalizeShortPathSegment(username);
-    const { data: user } = await supabase
-      .from('short_users')
-      .select('id')
-      .eq('username', normalizedUsername)
-      .single();
+    const owner = await resolveOwnerCode(supabase, normalizedUsername);
 
-    if (!user) {
+    if (!owner) {
       return { error: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
     }
 
@@ -37,7 +34,7 @@ async function loadFileRow(request) {
         'id, type, code, file_name, file_size, file_mime, file_path, link_password_hash, link_password_unlock_version, expiration_date, created_at'
       )
       .eq('code', normalizedCode)
-      .eq('user_id', user.id)
+      .eq('user_code_id', owner.codeId)
       .single();
 
     urlData = data;

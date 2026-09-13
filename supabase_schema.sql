@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS short_users (
   auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
   username_changed_at TIMESTAMPTZ,
   accepts_optional_mail BOOLEAN NOT NULL DEFAULT TRUE,
+  max_codes INTEGER NOT NULL DEFAULT 2, -- 본인코드 보유 한도 (추후 유료 플랜 상향)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   last_login TIMESTAMPTZ
@@ -25,7 +26,30 @@ CREATE INDEX IF NOT EXISTS idx_short_users_username ON short_users(username);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_short_users_auth_user_id
   ON short_users(auth_user_id) WHERE auth_user_id IS NOT NULL;
 
--- 2. URL 테이블 생성
+-- 2. 본인코드 다중 소유 테이블
+CREATE TABLE IF NOT EXISTS short_user_codes (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES short_users(id) ON DELETE CASCADE,
+  username VARCHAR(50) NOT NULL,
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  username_changed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS short_user_codes_username_key
+  ON short_user_codes (username);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_short_user_codes_primary
+  ON short_user_codes (user_id) WHERE is_primary = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_short_user_codes_user_id
+  ON short_user_codes (user_id);
+
+ALTER TABLE short_user_codes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service can manage user codes" ON short_user_codes;
+CREATE POLICY "Service can manage user codes" ON short_user_codes FOR ALL USING (true);
+
+-- 3. URL 테이블 생성
 CREATE TABLE IF NOT EXISTS short_urls (
   id BIGSERIAL PRIMARY KEY,
   legacy_id INTEGER UNIQUE,
@@ -36,6 +60,7 @@ CREATE TABLE IF NOT EXISTS short_urls (
   visits INTEGER DEFAULT 0,
   last_visit TIMESTAMPTZ,
   user_id BIGINT REFERENCES short_users(id) ON DELETE CASCADE,
+  user_code_id BIGINT REFERENCES short_user_codes(id), -- 링크가 속한 본인코드 (회원만)
   -- 회원 단축 URL 비밀번호 보호 (NULL = 비활성)
   link_password_hash TEXT,
   link_password_unlock_version INTEGER NOT NULL DEFAULT 0
@@ -44,17 +69,18 @@ CREATE TABLE IF NOT EXISTS short_urls (
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_short_urls_code ON short_urls(code);
 CREATE INDEX IF NOT EXISTS idx_short_urls_user_id ON short_urls(user_id);
+CREATE INDEX IF NOT EXISTS idx_short_urls_user_code_id ON short_urls(user_code_id);
 CREATE INDEX IF NOT EXISTS idx_short_urls_expiration ON short_urls(expiration_date);
 
 -- user_id가 NULL인 경우를 위한 부분 유니크 인덱스
 CREATE UNIQUE INDEX IF NOT EXISTS idx_short_urls_code_null_user 
   ON short_urls(code) WHERE user_id IS NULL;
 
--- user_id가 NOT NULL인 경우의 유니크 제약
-CREATE UNIQUE INDEX IF NOT EXISTS idx_short_urls_code_user
-  ON short_urls(code, user_id);
+-- 회원: (code, user_code_id) 유니크 (같은 slug를 코드별로 사용 가능)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_short_urls_code_user_code
+  ON short_urls(code, user_code_id) WHERE user_code_id IS NOT NULL;
 
--- 3. updated_at 자동 갱신 트리거
+-- 4. updated_at 자동 갱신 트리거
 CREATE OR REPLACE FUNCTION update_short_users_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

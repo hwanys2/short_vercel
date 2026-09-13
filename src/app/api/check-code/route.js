@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
+import { pickUserCode } from '@/lib/userCodes';
 
 export async function GET(request) {
   try {
@@ -8,6 +9,7 @@ export async function GET(request) {
     const code = searchParams.get('code');
     const user = await requireAppUser(request);
     const userId = user?.id || null;
+    const codeIdParam = searchParams.get('code_id');
 
     if (!code) {
       return NextResponse.json({ available: false, message: '코드를 입력해주세요.' });
@@ -17,11 +19,15 @@ export async function GET(request) {
 
     let query = supabase
       .from('short_urls')
-      .select('expiration_date, user_id')
+      .select('expiration_date, user_id, user_code_id')
       .eq('code', code);
 
     if (userId) {
-      query = query.eq('user_id', userId);
+      const picked = pickUserCode(user, codeIdParam);
+      if (!picked.ok) {
+        return NextResponse.json({ available: false, message: picked.message });
+      }
+      query = query.eq('user_code_id', picked.code.id);
     } else {
       query = query.is('user_id', null);
     }

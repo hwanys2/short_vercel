@@ -8,6 +8,7 @@ import {
   USERNAME_CHANGE_CONFIRM_PHRASE,
   serializeUsernameChangeCooldown,
 } from '@/lib/usernameChange';
+import { pickUserCode } from '@/lib/userCodes';
 
 function clientIp(request) {
   return (
@@ -21,27 +22,40 @@ function isTruthyAck(value) {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
 
-async function loadUsernameChangeContext(admin, userId) {
-  const { data: row, error } = await admin
-    .from('short_users')
-    .select('id, username, email, token_version, auth_user_id, username_changed_at')
-    .eq('id', userId)
-    .maybeSingle();
+async function loadCodeChangeContext(admin, user, codeIdParam) {
+  const picked = pickUserCode(user, codeIdParam);
+  if (!picked.ok) return { error: picked };
 
-  if (error) throw error;
-  if (!row) return null;
-
+  const codeRow = picked.code;
   const { count, error: countError } = await admin
     .from('short_urls')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId);
+    .eq('user_code_id', codeRow.id);
 
   if (countError) throw countError;
 
+  // DB에서 최신 username_changed_at 재조회
+  const { data: fresh, error } = await admin
+    .from('short_user_codes')
+    .select('id, username, is_primary, username_changed_at, user_id')
+    .eq('id', codeRow.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!fresh) {
+    return { error: { ok: false, message: '본인 코드를 찾을 수 없습니다.', status: 404 } };
+  }
+
   return {
-    row,
+    codeRow: {
+      id: Number(fresh.id),
+      username: fresh.username,
+      is_primary: Boolean(fresh.is_primary),
+      username_changed_at: fresh.username_changed_at,
+    },
     urlCount: typeof count === 'number' ? count : 0,
-    cooldown: serializeUsernameChangeCooldown(row.username_changed_at),
+    cooldown: serializeUsernameChangeCooldown(fresh.username_changed_at),
   };
 }
 
@@ -55,18 +69,21 @@ export async function GET(request) {
       );
     }
 
+    const { searchParams } = new URL(request.url);
     const admin = getSupabaseAdmin();
-    const context = await loadUsernameChangeContext(admin, user.id);
-    if (!context) {
+    const context = await loadCodeChangeContext(admin, user, searchParams.get('code_id'));
+    if (context.error) {
       return NextResponse.json(
-        { success: false, message: '사용자를 찾을 수 없습니다.' },
-        { status: 404 }
+        { success: false, message: context.error.message },
+        { status: context.error.status || 400 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      username: context.row.username,
+      username: context.codeRow.username,
+      code_id: context.codeRow.id,
+      is_primary: context.codeRow.is_primary,
       url_count: context.urlCount,
       ...context.cooldown,
     });
@@ -146,23 +163,23 @@ export async function POST(request) {
     }
 
     const admin = getSupabaseAdmin();
-    const context = await loadUsernameChangeContext(admin, user.id);
-    if (!context) {
+    const context = await loadCodeChangeContext(admin, user, body.code_id);
+    if (context.error) {
       return NextResponse.json(
-        { success: false, message: '사용자를 찾을 수 없습니다.' },
-        { status: 404 }
+        { success: false, message: context.error.message },
+        { status: context.error.status || 400 }
       );
     }
 
-    const { row, cooldown } = context;
-    if (!usernamesEqual(typedCurrent, row.username)) {
+    const { codeRow, cooldown } = context;
+    if (!usernamesEqual(typedCurrent, codeRow.username)) {
       return NextResponse.json(
         { success: false, message: '현재 본인 코드를 정확히 입력해주세요.' },
         { status: 400 }
       );
     }
 
-    if (usernamesEqual(cleanUsername, row.username)) {
+    if (usernamesEqual(cleanUsername, codeRow.username)) {
       return NextResponse.json(
         { success: false, message: '현재와 동일한 본인 코드입니다.' },
         { status: 400 }
@@ -181,10 +198,10 @@ export async function POST(request) {
     }
 
     const { data: taken, error: takenError } = await admin
-      .from('short_users')
+      .from('short_user_codes')
       .select('id')
       .eq('username', cleanUsername)
-      .neq('id', user.id)
+      .neq('id', codeRow.id)
       .maybeSingle();
 
     if (takenError) throw takenError;
@@ -195,60 +212,124 @@ export async function POST(request) {
       );
     }
 
-    const newTv = (row.token_version || 1) + 1;
     const changedAt = new Date().toISOString();
 
-    const { data: updated, error: updateError } = await admin
-      .from('short_users')
+    if (codeRow.is_primary) {
+      // primary: short_users 업데이트 → 트리거가 short_user_codes 동기화
+      const { data: userRow, error: userFetchErr } = await admin
+        .from('short_users')
+        .select('id, username, email, token_version, auth_user_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (userFetchErr) throw userFetchErr;
+      if (!userRow) {
+        return NextResponse.json(
+          { success: false, message: '사용자를 찾을 수 없습니다.' },
+          { status: 404 }
+        );
+      }
+
+      const newTv = (userRow.token_version || 1) + 1;
+
+      const { data: updated, error: updateError } = await admin
+        .from('short_users')
+        .update({
+          username: cleanUsername,
+          username_changed_at: changedAt,
+          token_version: newTv,
+          updated_at: changedAt,
+        })
+        .eq('id', user.id)
+        .select('id, username, email, username_changed_at')
+        .single();
+
+      if (updateError) {
+        if (updateError.code === '23505') {
+          return NextResponse.json(
+            { success: false, message: '이미 다른 사람이 사용 중인 본인 코드입니다.' },
+            { status: 409 }
+          );
+        }
+        throw updateError;
+      }
+
+      if (userRow.auth_user_id) {
+        try {
+          await admin.auth.admin.updateUserById(userRow.auth_user_id, {
+            user_metadata: { username: cleanUsername },
+          });
+        } catch (metaErr) {
+          console.error('Auth username metadata sync error:', metaErr);
+        }
+      }
+
+      const newToken = createToken({
+        id: user.id,
+        username: updated.username,
+        email: userRow.email || user.email,
+        token_version: newTv,
+      });
+      await setAuthCookie(newToken);
+
+      return NextResponse.json({
+        success: true,
+        message:
+          '본인 코드가 변경되었습니다. 기존 단축 주소는 즉시 무효가 되며, 이전 코드는 다른 사람이 사용할 수 있습니다.',
+        user: {
+          id: updated.id,
+          username: updated.username,
+          email: updated.email,
+        },
+        code: {
+          id: codeRow.id,
+          username: updated.username,
+          is_primary: true,
+        },
+        previous_username: codeRow.username,
+        ...serializeUsernameChangeCooldown(updated.username_changed_at),
+      });
+    }
+
+    // 추가 코드: short_user_codes만 갱신
+    const { data: updatedCode, error: codeUpdateError } = await admin
+      .from('short_user_codes')
       .update({
         username: cleanUsername,
         username_changed_at: changedAt,
-        token_version: newTv,
-        updated_at: changedAt,
       })
-      .eq('id', user.id)
-      .select('id, username, email, username_changed_at')
+      .eq('id', codeRow.id)
+      .eq('user_id', user.id)
+      .eq('is_primary', false)
+      .select('id, username, is_primary, username_changed_at')
       .single();
 
-    if (updateError) {
-      if (updateError.code === '23505') {
+    if (codeUpdateError) {
+      if (codeUpdateError.code === '23505') {
         return NextResponse.json(
           { success: false, message: '이미 다른 사람이 사용 중인 본인 코드입니다.' },
           { status: 409 }
         );
       }
-      throw updateError;
+      throw codeUpdateError;
     }
-
-    if (row.auth_user_id) {
-      try {
-        await admin.auth.admin.updateUserById(row.auth_user_id, {
-          user_metadata: { username: cleanUsername },
-        });
-      } catch (metaErr) {
-        console.error('Auth username metadata sync error:', metaErr);
-      }
-    }
-
-    const newToken = createToken({
-      id: user.id,
-      username: updated.username,
-      email: row.email || user.email,
-      token_version: newTv,
-    });
-    await setAuthCookie(newToken);
 
     return NextResponse.json({
       success: true,
       message:
         '본인 코드가 변경되었습니다. 기존 단축 주소는 즉시 무효가 되며, 이전 코드는 다른 사람이 사용할 수 있습니다.',
       user: {
-        id: updated.id,
-        username: updated.username,
-        email: updated.email,
+        id: user.id,
+        username: user.username,
+        email: user.email,
       },
-      previous_username: row.username,
-      ...serializeUsernameChangeCooldown(updated.username_changed_at),
+      code: {
+        id: Number(updatedCode.id),
+        username: updatedCode.username,
+        is_primary: false,
+      },
+      previous_username: codeRow.username,
+      ...serializeUsernameChangeCooldown(updatedCode.username_changed_at),
     });
   } catch (error) {
     console.error('Change username error:', error);

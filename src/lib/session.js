@@ -2,11 +2,17 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';
 import { normalizeEmail } from '@/lib/authBridge';
+import { sortUserCodes, getPrimaryCode, MAX_CODES_DEFAULT } from '@/lib/userCodes';
 
 const LEGACY_COOKIE = 'short_auth_token';
 
+const USER_SELECT =
+  'id, username, email, token_version, auth_user_id, username_changed_at, max_codes, short_user_codes(id, username, is_primary, username_changed_at, created_at)';
+
 function shapeUser(row) {
   if (!row) return null;
+  const codes = sortUserCodes(row.short_user_codes);
+  const primary = getPrimaryCode(codes);
   return {
     id: row.id,
     username: row.username,
@@ -14,6 +20,9 @@ function shapeUser(row) {
     tv: row.token_version ?? null,
     auth_user_id: row.auth_user_id ?? null,
     username_changed_at: row.username_changed_at ?? null,
+    max_codes: typeof row.max_codes === 'number' ? row.max_codes : MAX_CODES_DEFAULT,
+    codes,
+    primaryCode: primary,
   };
 }
 
@@ -28,7 +37,10 @@ function shapeUser(row) {
  *   auth_user_id?: string|null,
  *   authUserId?: string,
  *   needsOnboarding?: boolean,
- *   source?: 'supabase'|'legacy'
+ *   source?: 'supabase'|'legacy',
+ *   max_codes?: number,
+ *   codes?: Array<{id:number,username:string,is_primary:boolean}>,
+ *   primaryCode?: {id:number,username:string,is_primary:boolean}|null
  * }>}
  */
 export async function resolveAppUser(request = null) {
@@ -46,7 +58,7 @@ export async function resolveAppUser(request = null) {
     if (!claimsError && authUserId) {
       const { data: row } = await admin
         .from('short_users')
-        .select('id, username, email, token_version, auth_user_id, username_changed_at')
+        .select(USER_SELECT)
         .eq('auth_user_id', authUserId)
         .maybeSingle();
 
@@ -68,6 +80,9 @@ export async function resolveAppUser(request = null) {
         authUserId,
         needsOnboarding: true,
         source: 'supabase',
+        max_codes: MAX_CODES_DEFAULT,
+        codes: [],
+        primaryCode: null,
       };
     }
   } catch (err) {
@@ -92,7 +107,7 @@ export async function resolveAppUser(request = null) {
 
     const { data: row } = await admin
       .from('short_users')
-      .select('id, username, email, token_version, auth_user_id, username_changed_at')
+      .select(USER_SELECT)
       .eq('id', decoded.id)
       .maybeSingle();
 

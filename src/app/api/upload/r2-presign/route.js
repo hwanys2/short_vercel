@@ -13,6 +13,7 @@ import {
   normalizeDisplayFileName,
   resolveAllowedMime,
 } from '@/lib/shortFiles';
+import { pickUserCode } from '@/lib/userCodes';
 
 export const runtime = 'nodejs';
 
@@ -98,7 +99,14 @@ export async function POST(request) {
         .eq('code', code);
 
       if (userId) {
-        query = query.eq('user_id', userId);
+        const picked = pickUserCode(user, body.code_id);
+        if (!picked.ok) {
+          return NextResponse.json(
+            { status: 'error', message: picked.message },
+            { status: picked.status }
+          );
+        }
+        query = query.eq('user_code_id', picked.code.id);
       } else {
         query = query.is('user_id', null);
       }

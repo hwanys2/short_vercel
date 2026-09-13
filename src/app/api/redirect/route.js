@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment, readMiddlewareShortHeader } from '@/lib/pathSegments';
 import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
+import { resolveOwnerCode } from '@/lib/userCodes';
 
 export async function GET(request) {
   const { searchParams } = request.nextUrl;
@@ -26,13 +27,9 @@ export async function GET(request) {
 
     if (username) {
       // 회원 URL 패턴: /username/code
-      const { data: user } = await supabase
-        .from('short_users')
-        .select('id')
-        .eq('username', username)
-        .single();
+      const owner = await resolveOwnerCode(supabase, username);
 
-      if (!user) {
+      if (!owner) {
         return NextResponse.redirect(new URL('/missing.link', request.url), 302);
       }
 
@@ -40,7 +37,7 @@ export async function GET(request) {
         .from('short_urls')
         .select('original_url, id, link_password_hash, link_password_unlock_version, type, text_content')
         .eq('code', code)
-        .eq('user_id', user.id)
+        .eq('user_code_id', owner.codeId)
         .single();
 
       if (urlData) {

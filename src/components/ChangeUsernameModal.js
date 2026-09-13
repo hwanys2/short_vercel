@@ -13,7 +13,10 @@ function formatNextChangeAt(iso) {
   }
 }
 
-export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onChanged }) {
+/**
+ * @param {{ open: boolean, user: object, code?: {id:number,username:string,is_primary?:boolean}|null, baseUrl: string, onClose: Function, onChanged: Function }} props
+ */
+export default function ChangeUsernameModal({ open, user, code = null, baseUrl, onClose, onChanged }) {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [status, setStatus] = useState(null);
   const [newUsername, setNewUsername] = useState('');
@@ -26,7 +29,13 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const current = user?.username || '';
+  const targetCode = code || {
+    id: user?.primary_code_id || null,
+    username: user?.username || '',
+    is_primary: true,
+  };
+  const current = targetCode?.username || user?.username || '';
+  const isPrimary = targetCode?.is_primary !== false;
   const canChange = status?.can_change !== false;
 
   useEffect(() => {
@@ -43,7 +52,8 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
     setAckRelease(false);
     setAvailability(null);
 
-    fetch('/api/auth/change-username')
+    const qs = targetCode?.id ? `?code_id=${encodeURIComponent(targetCode.id)}` : '';
+    fetch(`/api/auth/change-username${qs}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -64,7 +74,7 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, targetCode?.id]);
 
   useEffect(() => {
     if (!open || !canChange) return undefined;
@@ -75,14 +85,16 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
     }
 
     const timer = setTimeout(() => {
-      fetch(`/api/auth/check-username?username=${encodeURIComponent(trimmed)}`)
+      const qs = new URLSearchParams({ username: trimmed });
+      if (targetCode?.id) qs.set('code_id', String(targetCode.id));
+      fetch(`/api/auth/check-username?${qs}`)
         .then((res) => res.json())
         .then((data) => setAvailability(data))
         .catch(() => setAvailability(null));
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [open, canChange, newUsername]);
+  }, [open, canChange, newUsername, targetCode?.id]);
 
   if (!open) return null;
 
@@ -123,6 +135,7 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          code_id: targetCode?.id,
           new_username: newUsername,
           new_username_confirm: newUsernameConfirm,
           current_username: currentUsername,
@@ -197,7 +210,7 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
                   <strong>이 변경은 되돌릴 수 없습니다.</strong>
                   <ul style={{ margin: '8px 0 0 16px', fontSize: '0.85rem', lineHeight: 1.55 }}>
                     <li>
-                      지금 가진 단축 주소 <strong>{urlCount.toLocaleString()}개</strong>가 모두 새 주소로 바뀝니다.
+                      이 본인 코드의 단축 주소 <strong>{urlCount.toLocaleString()}개</strong>가 모두 새 주소로 바뀝니다.
                     </li>
                     <li>
                       이미 공유한 링크, QR, 인쇄물은 <strong>즉시 열리지 않습니다.</strong>
@@ -205,7 +218,9 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
                     <li>
                       이전 본인 코드 <strong>{current}</strong>는 바로 해제되어, 다른 사람이 가져갈 수 있습니다.
                     </li>
-                    <li>이메일·비밀번호 로그인 시 예전 본인 코드로는 로그인되지 않습니다.</li>
+                    {isPrimary && (
+                      <li>이메일·비밀번호 로그인 시 예전 본인 코드로는 로그인되지 않습니다.</li>
+                    )}
                     <li>본인 코드는 <strong>30일에 한 번</strong>만 바꿀 수 있습니다.</li>
                   </ul>
                 </div>
@@ -294,7 +309,7 @@ export default function ChangeUsernameModal({ open, user, baseUrl, onClose, onCh
                           style={{ marginTop: '3px' }}
                         />
                         <span>
-                          내 단축 주소가 모두 바뀌고, 기존 주소는 바로 작동하지 않음을 이해합니다.
+                          이 본인 코드의 단축 주소가 모두 바뀌고, 기존 주소는 바로 작동하지 않음을 이해합니다.
                         </span>
                       </label>
                     </div>

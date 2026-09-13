@@ -118,19 +118,48 @@ export async function POST(request) {
 
     const admin = getSupabaseAdmin();
 
-    let userQuery = admin
-      .from('short_users')
-      .select('id, username, email, password, token_version, auth_user_id');
+    let user = null;
 
     if (isEmail) {
-      userQuery = userQuery.eq('email', normalizeEmail(trimmedInput));
+      const { data, error: userError } = await admin
+        .from('short_users')
+        .select('id, username, email, password, token_version, auth_user_id')
+        .eq('email', normalizeEmail(trimmedInput))
+        .maybeSingle();
+      if (userError) {
+        return NextResponse.json(
+          { success: false, message: '사용자를 찾을 수 없습니다.' },
+          { status: 401 }
+        );
+      }
+      user = data;
     } else {
-      userQuery = userQuery.eq('username', trimmedInput);
+      // 본인코드(기본·추가) 어느 쪽으로도 로그인 가능
+      const { data: codeRow } = await admin
+        .from('short_user_codes')
+        .select('user_id')
+        .eq('username', trimmedInput)
+        .maybeSingle();
+
+      if (codeRow?.user_id) {
+        const { data } = await admin
+          .from('short_users')
+          .select('id, username, email, password, token_version, auth_user_id')
+          .eq('id', codeRow.user_id)
+          .maybeSingle();
+        user = data;
+      } else {
+        // 폴백: short_users.username (코드 테이블 미동기화 대비)
+        const { data } = await admin
+          .from('short_users')
+          .select('id, username, email, password, token_version, auth_user_id')
+          .eq('username', trimmedInput)
+          .maybeSingle();
+        user = data;
+      }
     }
 
-    const { data: user, error: userError } = await userQuery.maybeSingle();
-
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.json(
         { success: false, message: '사용자를 찾을 수 없습니다.' },
         { status: 401 }

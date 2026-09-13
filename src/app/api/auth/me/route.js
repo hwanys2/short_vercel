@@ -3,6 +3,7 @@ import { isAdminEmail } from '@/lib/admin';
 import { resolveAppUser } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { serializeUsernameChangeCooldown } from '@/lib/usernameChange';
+import { MAX_CODES_DEFAULT } from '@/lib/userCodes';
 
 export async function GET() {
   const user = await resolveAppUser();
@@ -20,11 +21,22 @@ export async function GET() {
         username: null,
         email: user.email,
         is_admin: false,
+        codes: [],
+        max_codes: MAX_CODES_DEFAULT,
+        can_add_code: false,
       },
     });
   }
 
   const cooldown = serializeUsernameChangeCooldown(user.username_changed_at);
+  const codes = (user.codes || []).map((c) => ({
+    id: c.id,
+    username: c.username,
+    is_primary: c.is_primary,
+    username_changed_at: c.username_changed_at || null,
+    created_at: c.created_at || null,
+  }));
+  const maxCodes = user.max_codes ?? MAX_CODES_DEFAULT;
 
   let acceptsOptionalMail = true;
   let hasPassword = false;
@@ -57,6 +69,10 @@ export async function GET() {
       can_change_username: cooldown.can_change,
       username_change_remaining_label: cooldown.remaining_label,
       username_change_next_at: cooldown.next_change_at,
+      codes,
+      max_codes: maxCodes,
+      can_add_code: codes.length < maxCodes,
+      primary_code_id: user.primaryCode?.id || null,
     },
   });
 }

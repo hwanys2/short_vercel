@@ -5,6 +5,7 @@ import { requireAppUser } from '@/lib/session';
 import { guestDuplicateCodeMessage, memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
 import { deleteShortUrlWithFile } from '@/lib/shortFiles';
+import { pickUserCode } from '@/lib/userCodes';
 
 const MAX_TEXT_LENGTH = 50000;
 
@@ -15,6 +16,7 @@ export async function POST(request) {
       custom_code,
       expire_duration = '1week',
       type = 'url',
+      code_id,
     } = body;
 
     // 타입 검증
@@ -80,6 +82,17 @@ export async function POST(request) {
     // 현재 사용자 확인
     const user = await requireAppUser(request);
     const userId = user?.id || null;
+    let ownerCode = null;
+    if (userId) {
+      const picked = pickUserCode(user, code_id);
+      if (!picked.ok) {
+        return NextResponse.json(
+          { status: 'error', message: picked.message },
+          { status: picked.status }
+        );
+      }
+      ownerCode = picked.code;
+    }
 
     const supabase = getSupabaseAdmin();
 
@@ -89,8 +102,8 @@ export async function POST(request) {
       .select('id, expiration_date, user_id, type, file_path')
       .eq('code', code);
 
-    if (userId) {
-      query = query.eq('user_id', userId);
+    if (userId && ownerCode) {
+      query = query.eq('user_code_id', ownerCode.id);
     } else {
       query = query.is('user_id', null);
     }
@@ -145,7 +158,10 @@ export async function POST(request) {
       insertData.text_content = body.text_content;
     }
 
-    if (userId) insertData.user_id = userId;
+    if (userId && ownerCode) {
+      insertData.user_id = userId;
+      insertData.user_code_id = ownerCode.id;
+    }
 
     if (body.link_password_enabled === true) {
       const rawPwd = typeof body.link_password === 'string' ? body.link_password.trim() : '';
@@ -174,7 +190,7 @@ export async function POST(request) {
 
     const shortUrl = buildShortUrl({
       code,
-      username: userId && user ? user.username : undefined,
+      username: ownerCode ? ownerCode.username : undefined,
     });
 
     const successMessage = type === 'text'
@@ -191,6 +207,8 @@ export async function POST(request) {
           code,
           expiration_date: expirationDate,
           type,
+          username: ownerCode?.username || null,
+          user_code_id: ownerCode?.id || null,
         },
       },
       { status: 201 }

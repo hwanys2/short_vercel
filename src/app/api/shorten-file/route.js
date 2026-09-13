@@ -18,6 +18,7 @@ import {
   uploadShortFile,
   validateUploadFile,
 } from '@/lib/shortFiles';
+import { pickUserCode } from '@/lib/userCodes';
 
 export const runtime = 'nodejs';
 
@@ -60,6 +61,10 @@ export async function POST(request) {
   try {
     const user = await requireAppUser(request);
     const userId = user?.id || null;
+    let ownerCode = null;
+    if (userId) {
+      // code_id는 JSON/FormData에서 각각 읽음 — 아래에서 설정
+    }
     const supabase = getSupabaseAdmin();
 
     // ========================================================
@@ -72,6 +77,17 @@ export async function POST(request) {
           { status: 'error', message: '요청 데이터가 올바르지 않습니다.' },
           { status: 400 }
         );
+      }
+
+      if (userId) {
+        const picked = pickUserCode(user, body.code_id);
+        if (!picked.ok) {
+          return NextResponse.json(
+            { status: 'error', message: picked.message },
+            { status: picked.status }
+          );
+        }
+        ownerCode = picked.code;
       }
 
       const {
@@ -119,8 +135,8 @@ export async function POST(request) {
         .select('id, expiration_date, user_id, type, file_path')
         .eq('code', code);
 
-      if (userId) {
-        query = query.eq('user_id', userId);
+      if (userId && ownerCode) {
+        query = query.eq('user_code_id', ownerCode.id);
       } else {
         query = query.is('user_id', null);
       }
@@ -159,7 +175,10 @@ export async function POST(request) {
         file_mime: fileMime || 'application/octet-stream',
       };
 
-      if (userId) insertData.user_id = userId;
+      if (userId && ownerCode) {
+        insertData.user_id = userId;
+        insertData.user_code_id = ownerCode.id;
+      }
 
       if (linkPasswordEnabled) {
         const rawPwd = typeof linkPassword === 'string' ? linkPassword.trim() : '';
@@ -188,7 +207,7 @@ export async function POST(request) {
 
       const shortUrl = buildShortUrl({
         code,
-        username: userId && user ? user.username : undefined,
+        username: ownerCode ? ownerCode.username : undefined,
       });
 
       return NextResponse.json(
@@ -203,6 +222,8 @@ export async function POST(request) {
             type: 'file',
             file_name: fileName,
             file_size: fileSize,
+            username: ownerCode?.username || null,
+            user_code_id: ownerCode?.id || null,
           },
         },
         { status: 201 }
@@ -219,6 +240,18 @@ export async function POST(request) {
     const linkPasswordEnabled =
       form.get('link_password_enabled') === 'true' || form.get('link_password_enabled') === '1';
     const linkPassword = typeof form.get('link_password') === 'string' ? form.get('link_password') : '';
+    const formCodeId = form.get('code_id');
+
+    if (userId) {
+      const picked = pickUserCode(user, formCodeId);
+      if (!picked.ok) {
+        return NextResponse.json(
+          { status: 'error', message: picked.message },
+          { status: picked.status }
+        );
+      }
+      ownerCode = picked.code;
+    }
 
     if (!file || typeof file === 'string') {
       return NextResponse.json(
@@ -261,8 +294,8 @@ export async function POST(request) {
       .select('id, expiration_date, user_id, type, file_path')
       .eq('code', code);
 
-    if (userId) {
-      query = query.eq('user_id', userId);
+    if (userId && ownerCode) {
+      query = query.eq('user_code_id', ownerCode.id);
     } else {
       query = query.is('user_id', null);
     }
@@ -305,7 +338,10 @@ export async function POST(request) {
       file_mime: validated.mime,
     };
 
-    if (userId) insertData.user_id = userId;
+    if (userId && ownerCode) {
+      insertData.user_id = userId;
+      insertData.user_code_id = ownerCode.id;
+    }
 
     if (linkPasswordEnabled) {
       const rawPwd = linkPassword.trim();
@@ -334,7 +370,7 @@ export async function POST(request) {
 
     const shortUrl = buildShortUrl({
       code,
-      username: userId && user ? user.username : undefined,
+      username: ownerCode ? ownerCode.username : undefined,
     });
 
     return NextResponse.json(
@@ -349,6 +385,8 @@ export async function POST(request) {
           type: 'file',
           file_name: validated.fileName,
           file_size: validated.fileSize,
+          username: ownerCode?.username || null,
+          user_code_id: ownerCode?.id || null,
         },
       },
       { status: 201 }

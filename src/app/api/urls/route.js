@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
 import { memberDuplicateCodeMessage } from '@/lib/shortCodeConflictMessage';
 import { buildShortUrl } from '@/lib/siteUrl';
+import { pickUserCode, parseCodeIdFilter } from '@/lib/userCodes';
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -20,6 +21,14 @@ function escapeIlike(q) {
   return String(q).replace(/[%_\\]/g, '\\$&');
 }
 
+function codeUsernameMap(user) {
+  const map = new Map();
+  for (const c of user.codes || []) {
+    map.set(Number(c.id), c.username);
+  }
+  return map;
+}
+
 // 내 URL 목록 가져오기
 export async function GET(request) {
   try {
@@ -34,20 +43,33 @@ export async function GET(request) {
     const q = (searchParams.get('q') || '').trim();
     const type = (searchParams.get('type') || 'all').trim(); // all | url | text | file
     const fileStatus = (searchParams.get('file_status') || 'all').trim(); // all | expiring | expired
+    const codeFilter = parseCodeIdFilter(searchParams.get('code_id'));
+    if (codeFilter === null) {
+      return NextResponse.json({ success: false, message: '유효하지 않은 본인 코드 필터입니다.' }, { status: 400 });
+    }
     const offset = (page - 1) * perPage;
     const now = Date.now();
     const nowIso = new Date(now).toISOString();
     const expiringUntil = new Date(now + TWO_DAYS_MS).toISOString();
+    const usernameByCodeId = codeUsernameMap(user);
 
     const supabase = getSupabaseAdmin();
 
     let query = supabase
       .from('short_urls')
       .select(
-        'id, code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_path',
+        'id, code, original_url, created_at, expiration_date, visits, last_visit, link_password_hash, type, text_content, file_name, file_size, file_path, user_code_id',
         { count: 'exact' }
       )
       .eq('user_id', user.id);
+
+    if (codeFilter !== 'all') {
+      const owned = (user.codes || []).some((c) => Number(c.id) === codeFilter);
+      if (!owned) {
+        return NextResponse.json({ success: false, message: '본인 코드를 찾을 수 없습니다.' }, { status: 400 });
+      }
+      query = query.eq('user_code_id', codeFilter);
+    }
 
     if (type === 'url' || type === 'text' || type === 'file') {
       query = query.eq('type', type);
@@ -73,9 +95,6 @@ export async function GET(request) {
       }
     }
 
-    // 만료·임박 파일을 위로: expiration_date asc for files mixed is imperfect in SQL alone.
-    // Fetch ordered by created_at desc; client/API will re-sort when file filters not applied.
-    // When file_status is set, order by expiration_date ascending.
     if (fileStatus === 'expired' || fileStatus === 'expiring') {
       query = query.order('expiration_date', { ascending: true });
     } else {
@@ -88,8 +107,11 @@ export async function GET(request) {
 
     let safeUrls = (urls || []).map(({ link_password_hash, text_content, file_path, ...u }) => {
       const retention = fileRetentionStatus({ ...u, file_path }, now);
+      const codeId = u.user_code_id != null ? Number(u.user_code_id) : null;
       return {
         ...u,
+        user_code_id: codeId,
+        code_username: codeId != null ? usernameByCodeId.get(codeId) || user.username : user.username,
         password_enabled: !!link_password_hash,
         type: u.type || 'url',
         text_preview: u.type === 'text' && text_content ? text_content.slice(0, 80) : null,
@@ -98,7 +120,6 @@ export async function GET(request) {
       };
     });
 
-    // 기본 목록: 만료·임박 파일을 페이지 내에서 위로
     if (fileStatus === 'all' && type === 'all' && !q) {
       const rank = (r) => {
         if (r.file_retention === 'expired') return 0;
@@ -112,7 +133,6 @@ export async function GET(request) {
       });
     }
 
-    // 최근 7일 방문 (목록 미니 차트용)
     const ids = safeUrls.map((u) => u.id).filter(Boolean);
     let visits7ById = {};
     if (ids.length > 0) {
@@ -153,7 +173,7 @@ export async function GET(request) {
       page,
       per_page: perPage,
       total_pages: Math.ceil((count || 0) / perPage),
-      filters: { q, type, file_status: fileStatus },
+      filters: { q, type, file_status: fileStatus, code_id: codeFilter === 'all' ? 'all' : codeFilter },
     });
   } catch (error) {
     console.error('Get URLs error:', error);
@@ -170,7 +190,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { original_url, custom_code, type = 'url', text_content } = body;
+    const { original_url, custom_code, type = 'url', text_content, code_id } = body;
     const code = custom_code?.trim();
 
     if (!code || (type === 'url' && !original_url) || (type === 'text' && (!text_content || !text_content.trim()))) {
@@ -184,14 +204,19 @@ export async function POST(request) {
       );
     }
 
+    const picked = pickUserCode(user, code_id);
+    if (!picked.ok) {
+      return NextResponse.json({ success: false, message: picked.message }, { status: picked.status });
+    }
+    const ownerCode = picked.code;
+
     const supabase = getSupabaseAdmin();
 
-    // 중복 확인
     const { data: existing } = await supabase
       .from('short_urls')
       .select('id')
       .eq('code', code)
-      .eq('user_id', user.id)
+      .eq('user_code_id', ownerCode.id)
       .maybeSingle();
 
     if (existing) {
@@ -201,13 +226,13 @@ export async function POST(request) {
       );
     }
 
-    // 100년 만료
     const expirationDate = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
 
     const insertData = {
       original_url: type === 'url' ? original_url : '__text__',
       code,
       user_id: user.id,
+      user_code_id: ownerCode.id,
       expiration_date: expirationDate,
       visits: 0,
       type,
@@ -223,7 +248,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'URL 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    const shortUrl = buildShortUrl({ code, username: user.username });
+    const shortUrl = buildShortUrl({ code, username: ownerCode.username });
 
     return NextResponse.json({
       success: true,
@@ -233,7 +258,8 @@ export async function POST(request) {
         code,
         type,
         expiration_date: expirationDate,
-        username: user.username,
+        username: ownerCode.username,
+        user_code_id: ownerCode.id,
       },
     });
   } catch (error) {

@@ -1,17 +1,39 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { formatFileSize, MAX_FILE_BYTES, getFileCapacityRetentionInfo } from '@/lib/shortFilesShared';
 import { uploadFileToR2Only } from '@/lib/fileUploadClient';
 
 export default function EditUrlPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Header />
+          <main className="dashboard-page">
+            <div className="container" style={{ textAlign: 'center', padding: '48px' }}>
+              <span className="spinner" style={{ borderTopColor: 'var(--primary)' }} />
+            </div>
+          </main>
+          <Footer />
+        </>
+      }
+    >
+      <EditUrlPageInner />
+    </Suspense>
+  );
+}
+
+function EditUrlPageInner() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const routeCode = typeof params?.code === 'string' ? params.code : params?.code?.[0] ?? '';
+  const initialCodeId = searchParams.get('code_id');
 
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -26,6 +48,8 @@ export default function EditUrlPage() {
   const [replacementFile, setReplacementFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [customCode, setCustomCode] = useState('');
+  const [scopeCodeId, setScopeCodeId] = useState(initialCodeId ? Number(initialCodeId) : null);
+  const [targetCodeId, setTargetCodeId] = useState(initialCodeId ? Number(initialCodeId) : null);
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [hadPasswordProtection, setHadPasswordProtection] = useState(false);
   const [linkPassword, setLinkPassword] = useState('');
@@ -38,6 +62,13 @@ export default function EditUrlPage() {
   const [visitsLoading, setVisitsLoading] = useState(false);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
+  const userCodes = user?.codes || [];
+  const hasMultipleCodes = userCodes.length > 1;
+  const activeCode =
+    userCodes.find((c) => Number(c.id) === Number(targetCodeId)) ||
+    userCodes.find((c) => c.is_primary) ||
+    userCodes[0];
+  const displayUsername = activeCode?.username || user?.username;
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -60,7 +91,8 @@ export default function EditUrlPage() {
     setLoadingUrl(true);
     setError('');
     try {
-      const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}`);
+      const qs = scopeCodeId ? `?code_id=${encodeURIComponent(scopeCodeId)}` : '';
+      const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}${qs}`);
       const data = await res.json();
       if (!data.success) {
         setError(data.message || 'URL을 불러올 수 없습니다.');
@@ -78,6 +110,11 @@ export default function EditUrlPage() {
       setExpirationDate(data.url.expiration_date || null);
       setReplacementFile(null);
       setCustomCode(data.url.code);
+      if (data.url.user_code_id != null) {
+        const cid = Number(data.url.user_code_id);
+        setScopeCodeId(cid);
+        setTargetCodeId(cid);
+      }
       const protectedNow = !!data.url.password_enabled;
       setPasswordEnabled(protectedNow);
       setHadPasswordProtection(protectedNow);
@@ -88,17 +125,21 @@ export default function EditUrlPage() {
     } finally {
       setLoadingUrl(false);
     }
-  }, [routeCode, user]);
+  }, [routeCode, user, scopeCodeId]);
 
   useEffect(() => {
     if (user) loadUrl();
-  }, [user, loadUrl]);
+    // scopeCodeId는 최초 로드/쿼리용 — 저장 전 타깃 변경으로 재조회하지 않음
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, routeCode]);
 
   useEffect(() => {
     if (!user || !routeCode) return;
     let ignore = false;
     setVisitsLoading(true);
-    fetch(`/api/urls/${encodeURIComponent(routeCode)}/visits?days=${visitDays}`)
+    const qs = new URLSearchParams({ days: String(visitDays) });
+    if (scopeCodeId) qs.set('code_id', String(scopeCodeId));
+    fetch(`/api/urls/${encodeURIComponent(routeCode)}/visits?${qs}`)
       .then((res) => res.json())
       .then((data) => {
         if (ignore) return;
@@ -114,7 +155,7 @@ export default function EditUrlPage() {
     return () => {
       ignore = true;
     };
-  }, [user, routeCode, visitDays]);
+  }, [user, routeCode, visitDays, scopeCodeId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -141,6 +182,8 @@ export default function EditUrlPage() {
       const payload = {
         custom_code: customCode,
         link_password_enabled: passwordEnabled,
+        code_id: scopeCodeId,
+        user_code_id: targetCodeId,
       };
 
       if (urlType === 'text') {
@@ -157,6 +200,7 @@ export default function EditUrlPage() {
           const uploaded = await uploadFileToR2Only({
             file: replacementFile,
             customCode: customCode.trim(),
+            codeId: scopeCodeId,
             onProgress: (prog) => setUploadProgress(prog),
             signal: abortController.signal,
             isEdit: true,
@@ -176,7 +220,7 @@ export default function EditUrlPage() {
         payload.link_password = linkPassword.trim();
       }
 
-      const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}`, {
+      const res = await fetch(`/api/urls/${encodeURIComponent(routeCode)}?code_id=${encodeURIComponent(scopeCodeId || '')}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -225,7 +269,7 @@ export default function EditUrlPage() {
             <h1>{pageTitle}</h1>
             <div className="user-badge">
               단축 주소: {baseUrl}
-              {user.username}/코드
+              {displayUsername}/코드
             </div>
           </div>
 
@@ -417,9 +461,25 @@ export default function EditUrlPage() {
                   <div className="form-group">
                     <label className="form-label" htmlFor="edit-code">단축 코드</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                        {user.username}/
-                      </span>
+                      {hasMultipleCodes ? (
+                        <select
+                          className="form-input"
+                          style={{ width: 'auto', minWidth: '120px' }}
+                          aria-label="본인 코드"
+                          value={targetCodeId ?? ''}
+                          onChange={(e) => setTargetCodeId(Number(e.target.value))}
+                        >
+                          {userCodes.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.username}/
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                          {displayUsername}/
+                        </span>
+                      )}
                       <input
                         id="edit-code"
                         type="text"
@@ -433,6 +493,11 @@ export default function EditUrlPage() {
                         title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
                       />
                     </div>
+                    {hasMultipleCodes && (
+                      <p className="profile-hint" style={{ marginTop: 6 }}>
+                        본인 코드를 바꾸면 단축 주소가 새 코드 아래로 이동합니다.
+                      </p>
+                    )}
                   </div>
 
                   {/* 파일 업로드 진행률 바 */}

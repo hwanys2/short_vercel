@@ -23,7 +23,42 @@ export default function UrlForm({ user, onResult }) {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState('');
+  const [selectedCodeId, setSelectedCodeId] = useState(null);
   const abortControllerRef = useRef(null);
+
+  const userCodes = user?.codes || [];
+  const hasMultipleCodes = userCodes.length > 1;
+
+  useEffect(() => {
+    if (!user) {
+      setSelectedCodeId(null);
+      return;
+    }
+    const codes = user.codes || [];
+    const primaryId = user.primary_code_id || codes.find((c) => c.is_primary)?.id || codes[0]?.id || null;
+    let saved = null;
+    try {
+      saved = localStorage.getItem(`short_create_code_id_${user.id}`);
+    } catch {}
+    const savedNum = saved != null ? Number(saved) : null;
+    const validSaved = codes.some((c) => Number(c.id) === savedNum) ? savedNum : null;
+    setSelectedCodeId(validSaved || primaryId);
+  }, [user]);
+
+  const activeCode =
+    userCodes.find((c) => Number(c.id) === Number(selectedCodeId)) ||
+    userCodes.find((c) => c.is_primary) ||
+    userCodes[0];
+  const activeUsername = activeCode?.username || user?.username;
+
+  const setSelectedCodeIdPersist = (id) => {
+    setSelectedCodeId(id);
+    if (user?.id) {
+      try {
+        localStorage.setItem(`short_create_code_id_${user.id}`, String(id));
+      } catch {}
+    }
+  };
 
   // 업로드 도중 사용자가 실수로 탭을 닫거나 새로고침하는 것을 방지
   useEffect(() => {
@@ -46,7 +81,7 @@ export default function UrlForm({ user, onResult }) {
   };
 
   const baseUrl = '숏.한국/';
-  const prefix = user ? `${baseUrl}${user.username}/` : baseUrl;
+  const prefix = user ? `${baseUrl}${activeUsername}/` : baseUrl;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,6 +119,7 @@ export default function UrlForm({ user, onResult }) {
         const result = await uploadShortFileAuto({
           file,
           customCode: customCode.trim(),
+          codeId: selectedCodeId,
           expireDuration,
           linkPasswordEnabled: passwordProtect,
           linkPassword: passwordProtect ? linkPassword.trim() : '',
@@ -110,6 +146,7 @@ export default function UrlForm({ user, onResult }) {
         expire_duration: expireDuration,
         type: mode,
       };
+      if (selectedCodeId != null) body.code_id = selectedCodeId;
 
       if (mode === 'url') {
         body.original_url = originalUrl;
@@ -362,7 +399,22 @@ export default function UrlForm({ user, onResult }) {
         <div className="form-group">
           <label className="form-label" htmlFor="custom-code">단축 코드</label>
           <div className="code-input-group">
-            <span className="url-prefix">{prefix}</span>
+            {hasMultipleCodes ? (
+              <select
+                className="form-input url-code-select"
+                aria-label="본인 코드 선택"
+                value={selectedCodeId ?? ''}
+                onChange={(e) => setSelectedCodeIdPersist(Number(e.target.value))}
+              >
+                {userCodes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {baseUrl}{c.username}/
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="url-prefix">{prefix}</span>
+            )}
             <input
               id="custom-code"
               type="text"

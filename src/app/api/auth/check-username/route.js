@@ -48,7 +48,35 @@ export async function GET(request) {
     }
 
     const cleanUsername = usernameCheck.username;
-    if (sessionUser.username && usernamesEqual(sessionUser.username, cleanUsername)) {
+    const excludeCodeId = searchParams.get('code_id');
+
+    // 현재 편집 중인 코드와 동일하면 current
+    if (sessionUser.codes?.length) {
+      const ownMatch = sessionUser.codes.find((c) => usernamesEqual(c.username, cleanUsername));
+      if (ownMatch) {
+        if (excludeCodeId && Number(ownMatch.id) === Number(excludeCodeId)) {
+          return NextResponse.json({
+            success: true,
+            available: false,
+            current: true,
+            message: '현재 사용 중인 본인 코드입니다.',
+          });
+        }
+        if (!excludeCodeId && ownMatch.is_primary) {
+          return NextResponse.json({
+            success: true,
+            available: false,
+            current: true,
+            message: '현재 사용 중인 본인 코드입니다.',
+          });
+        }
+        return NextResponse.json({
+          success: true,
+          available: false,
+          message: '이미 내가 사용 중인 본인 코드입니다.',
+        });
+      }
+    } else if (sessionUser.username && usernamesEqual(sessionUser.username, cleanUsername)) {
       return NextResponse.json({
         success: true,
         available: false,
@@ -59,14 +87,14 @@ export async function GET(request) {
 
     const admin = getSupabaseAdmin();
     const { data: existing, error } = await admin
-      .from('short_users')
-      .select('id')
+      .from('short_user_codes')
+      .select('id, user_id')
       .eq('username', cleanUsername)
       .maybeSingle();
 
     if (error) throw error;
 
-    if (existing && existing.id !== sessionUser.id) {
+    if (existing) {
       return NextResponse.json({
         success: true,
         available: false,

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { setLinkUnlockCookieOnResponse } from '@/lib/linkUnlock';
+import { resolveOwnerCode } from '@/lib/userCodes';
 
 export async function POST(request) {
   let body;
@@ -30,9 +31,9 @@ export async function POST(request) {
     let unlockUsername = '';
 
     if (username) {
-      const { data: user } = await supabase.from('short_users').select('id').eq('username', username).single();
+      const owner = await resolveOwnerCode(supabase, username);
 
-      if (!user) {
+      if (!owner) {
         return NextResponse.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
       }
 
@@ -40,7 +41,7 @@ export async function POST(request) {
         .from('short_urls')
         .select('id, link_password_hash, link_password_unlock_version')
         .eq('code', code)
-        .eq('user_id', user.id)
+        .eq('user_code_id', owner.codeId)
         .maybeSingle();
 
       urlData = data;

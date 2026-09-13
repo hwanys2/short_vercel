@@ -27,6 +27,8 @@ export default function DashboardPage() {
   const [appliedQ, setAppliedQ] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [fileStatus, setFileStatus] = useState('all');
+  const [filterCodeId, setFilterCodeId] = useState('all');
+  const [createCodeId, setCreateCodeId] = useState(null);
 
   // 새 URL 생성 폼
   const [newUrl, setNewUrl] = useState('');
@@ -88,6 +90,15 @@ export default function DashboardPage() {
           router.push('/onboarding');
         } else {
           setUser(data.user);
+          const codes = data.user.codes || [];
+          const primaryId = data.user.primary_code_id || codes.find((c) => c.is_primary)?.id || codes[0]?.id || null;
+          let saved = null;
+          try {
+            saved = localStorage.getItem(`short_create_code_id_${data.user.id}`);
+          } catch {}
+          const savedNum = saved != null ? Number(saved) : null;
+          const validSaved = codes.some((c) => Number(c.id) === savedNum) ? savedNum : null;
+          setCreateCodeId(validSaved || primaryId);
         }
       })
       .catch(() => router.push('/login'));
@@ -95,7 +106,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user) fetchUrls();
-  }, [user, page, appliedQ, filterType, fileStatus]);
+  }, [user, page, appliedQ, filterType, fileStatus, filterCodeId]);
+
+  const userCodes = user?.codes || [];
+  const hasMultipleCodes = userCodes.length > 1;
+  const activeCreateCode =
+    userCodes.find((c) => Number(c.id) === Number(createCodeId)) ||
+    userCodes.find((c) => c.is_primary) ||
+    userCodes[0];
+  const createUsername = activeCreateCode?.username || user?.username;
+
+  const setCreateCodeIdPersist = (id) => {
+    setCreateCodeId(id);
+    if (user?.id) {
+      try {
+        localStorage.setItem(`short_create_code_id_${user.id}`, String(id));
+      } catch {}
+    }
+  };
 
   const fetchUrls = async () => {
     setLoading(true);
@@ -107,6 +135,7 @@ export default function DashboardPage() {
       if (appliedQ) params.set('q', appliedQ);
       if (filterType && filterType !== 'all') params.set('type', filterType);
       if (fileStatus && fileStatus !== 'all') params.set('file_status', fileStatus);
+      if (filterCodeId && filterCodeId !== 'all') params.set('code_id', String(filterCodeId));
 
       const res = await fetch(`/api/urls?${params}`);
       const data = await res.json();
@@ -165,6 +194,7 @@ export default function DashboardPage() {
         const uploaded = await uploadShortFileAuto({
           file: newFile,
           customCode: newCode.trim(),
+          codeId: createCodeId,
           expireDuration: fileExpireDuration,
           linkPasswordEnabled: false,
           onProgress: (prog) => {
@@ -181,7 +211,7 @@ export default function DashboardPage() {
                 short_url: buildShortUrl({
                   baseUrl,
                   code: newCode.trim(),
-                  username: user.username,
+                  username: createUsername,
                 }),
                 type: 'file',
                 expiration_date: null,
@@ -201,6 +231,7 @@ export default function DashboardPage() {
       const body = {
         custom_code: newCode,
         type: newMode,
+        code_id: createCodeId,
       };
       if (newMode === 'url') {
         body.original_url = newUrl;
@@ -220,7 +251,7 @@ export default function DashboardPage() {
             short_url: buildShortUrl({
               baseUrl,
               code: newCode.trim(),
-              username: user.username,
+              username: createUsername,
             }),
             type: newMode,
             expiration_date: null,
@@ -250,10 +281,11 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDelete = async (code) => {
+  const handleDelete = async (url) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     try {
-      const res = await fetch(`/api/urls/${encodeURIComponent(code)}`, { method: 'DELETE' });
+      const qs = url.user_code_id ? `?code_id=${encodeURIComponent(url.user_code_id)}` : '';
+      const res = await fetch(`/api/urls/${encodeURIComponent(url.code)}${qs}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         setMessage('URL이 삭제되었습니다.');
@@ -269,9 +301,10 @@ export default function DashboardPage() {
     }
   };
 
-  const copyUrl = (code) => {
-    const url = buildShortUrl({ baseUrl, code, username: user.username });
-    navigator.clipboard.writeText(url).then(() => alert('URL이 복사되었습니다!'));
+  const copyUrl = (url) => {
+    const username = url.code_username || user.username;
+    const short = buildShortUrl({ baseUrl, code: url.code, username });
+    navigator.clipboard.writeText(short).then(() => alert('URL이 복사되었습니다!'));
   };
 
   if (!user) return null;
@@ -284,7 +317,7 @@ export default function DashboardPage() {
           <div className="dashboard-header">
             <h1>{user.username}님의 대시보드</h1>
             <div className="user-badge">
-              ✨ URL·텍스트는 영구 · 파일은 10MB 이하 30일/대용량 7일(만료 시 수정에서 재등록 가능) · {baseUrl}{user.username}/코드
+              ✨ URL·텍스트는 영구 · 파일은 10MB 이하 30일/대용량 7일(만료 시 수정에서 재등록 가능) · {baseUrl}{createUsername}/코드
             </div>
           </div>
 
@@ -419,7 +452,22 @@ export default function DashboardPage() {
                 <div className="form-group dashboard-create-code">
                   <label className="form-label" htmlFor="dash-code">단축 코드</label>
                   <div className="dashboard-create-code-row">
-                    <span className="dashboard-create-code-prefix">{user.username}/</span>
+                    {hasMultipleCodes ? (
+                      <select
+                        className="form-input dashboard-create-code-select"
+                        aria-label="본인 코드 선택"
+                        value={createCodeId ?? ''}
+                        onChange={(e) => setCreateCodeIdPersist(Number(e.target.value))}
+                      >
+                        {userCodes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.username}/
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="dashboard-create-code-prefix">{createUsername}/</span>
+                    )}
                     <input
                       id="dash-code"
                       type="text"
@@ -504,7 +552,7 @@ export default function DashboardPage() {
                     aria-label="단축 주소 검색"
                   />
                   <button type="submit" className="btn btn-secondary btn-sm">검색</button>
-                  {(appliedQ || filterType !== 'all' || fileStatus !== 'all') && (
+                  {(appliedQ || filterType !== 'all' || fileStatus !== 'all' || filterCodeId !== 'all') && (
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
@@ -513,6 +561,7 @@ export default function DashboardPage() {
                         setAppliedQ('');
                         setFilterType('all');
                         setFileStatus('all');
+                        setFilterCodeId('all');
                         setPage(1);
                       }}
                     >
@@ -520,6 +569,33 @@ export default function DashboardPage() {
                     </button>
                   )}
                 </form>
+                {hasMultipleCodes && (
+                  <div className="dashboard-filter-chips" role="group" aria-label="본인코드 필터">
+                    <button
+                      type="button"
+                      className={`dash-chip ${filterCodeId === 'all' ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setFilterCodeId('all');
+                        setPage(1);
+                      }}
+                    >
+                      전체
+                    </button>
+                    {userCodes.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`dash-chip ${Number(filterCodeId) === Number(c.id) ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setFilterCodeId(c.id);
+                          setPage(1);
+                        }}
+                      >
+                        {c.username}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="dashboard-filter-chips" role="group" aria-label="타입 필터">
                   {[
                     { id: 'all', label: '전체' },
@@ -571,8 +647,8 @@ export default function DashboardPage() {
               ) : urls.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon">📂</div>
-                  <h3>{appliedQ || filterType !== 'all' || fileStatus !== 'all' ? '검색 결과가 없습니다' : '아직 생성된 URL이 없습니다'}</h3>
-                  <p>{appliedQ || filterType !== 'all' || fileStatus !== 'all' ? '다른 조건으로 다시 검색해 보세요.' : '위 폼을 사용하여 첫 번째 영구 URL을 만들어보세요!'}</p>
+                  <h3>{appliedQ || filterType !== 'all' || fileStatus !== 'all' || filterCodeId !== 'all' ? '검색 결과가 없습니다' : '아직 생성된 URL이 없습니다'}</h3>
+                  <p>{appliedQ || filterType !== 'all' || fileStatus !== 'all' || filterCodeId !== 'all' ? '다른 조건으로 다시 검색해 보세요.' : '위 폼을 사용하여 첫 번째 영구 URL을 만들어보세요!'}</p>
                 </div>
               ) : (
                 <div className="table-wrapper">
@@ -588,12 +664,14 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {urls.map((url) => (
-                        <tr key={url.code}>
+                      {urls.map((url) => {
+                        const codeUsername = url.code_username || user.username;
+                        return (
+                        <tr key={`${url.user_code_id || 'p'}-${url.code}`}>
                           <td>{url.type === 'text' ? '📋' : url.type === 'file' ? '📎' : '🔗'}</td>
                           <td>
-                            <a href={buildShortUrl({ baseUrl, code: url.code, username: user.username })} target="_blank" rel="noopener noreferrer">
-                              {user.username}/{url.code}
+                            <a href={buildShortUrl({ baseUrl, code: url.code, username: codeUsername })} target="_blank" rel="noopener noreferrer">
+                              {codeUsername}/{url.code}
                             </a>
                           </td>
                           <td className="url-cell" title={
@@ -630,23 +708,24 @@ export default function DashboardPage() {
                           <td>
                             <div className="url-actions">
                               <Link
-                                href={`/dashboard/edit/${encodeURIComponent(url.code)}`}
+                                href={`/dashboard/edit/${encodeURIComponent(url.code)}${url.user_code_id ? `?code_id=${url.user_code_id}` : ''}`}
                                 className="btn btn-secondary btn-icon"
                                 title="수정"
                                 aria-label="수정"
                               >
                                 ✏️
                               </Link>
-                              <button className="btn btn-secondary btn-icon" onClick={() => copyUrl(url.code)} title="복사">
+                              <button className="btn btn-secondary btn-icon" onClick={() => copyUrl(url)} title="복사">
                                 📋
                               </button>
-                              <button className="btn btn-danger btn-icon" onClick={() => handleDelete(url.code)} title="삭제">
+                              <button className="btn btn-danger btn-icon" onClick={() => handleDelete(url)} title="삭제">
                                 🗑️
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

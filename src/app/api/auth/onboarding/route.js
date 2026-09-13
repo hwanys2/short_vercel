@@ -47,7 +47,7 @@ export async function POST(request) {
     const admin = getSupabaseAdmin();
 
     const { data: existingUsername } = await admin
-      .from('short_users')
+      .from('short_user_codes')
       .select('id')
       .eq('username', cleanUsername)
       .maybeSingle();

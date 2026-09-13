@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { formatFileSize } from '@/lib/shortFilesShared';
 import { buildShortUrl, getSiteOrigin } from '@/lib/siteUrl';
+import { resolveOwnerCode } from '@/lib/userCodes';
 
 function truncate(text, max) {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
@@ -53,13 +54,9 @@ export async function loadLinkPreviewData({ code, username }) {
 
   if (username) {
     const normalizedUsername = normalizeShortPathSegment(username);
-    const { data: user } = await supabase
-      .from('short_users')
-      .select('id, username')
-      .eq('username', normalizedUsername)
-      .maybeSingle();
+    const owner = await resolveOwnerCode(supabase, normalizedUsername);
 
-    if (!user) {
+    if (!owner) {
       return {
         found: false,
         passwordProtected: false,
@@ -79,11 +76,11 @@ export async function loadLinkPreviewData({ code, username }) {
         'type, code, original_url, text_content, file_name, file_size, file_path, expiration_date, link_password_hash'
       )
       .eq('code', normalizedCode)
-      .eq('user_id', user.id)
+      .eq('user_code_id', owner.codeId)
       .maybeSingle();
 
     urlData = data;
-    unlockUsername = user.username;
+    unlockUsername = owner.username;
   } else {
     const { data } = await supabase
       .from('short_urls')

@@ -4,6 +4,7 @@ import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 import { createSignedDownloadUrl } from '@/lib/shortFiles';
 import { isR2Key, createR2PresignedGetUrl, isR2Configured, getR2PublicUrl } from '@/lib/r2';
+import { resolveOwnerCode } from '@/lib/userCodes';
 
 export async function GET(request) {
   try {
@@ -24,13 +25,9 @@ export async function GET(request) {
 
     if (username) {
       const normalizedUsername = normalizeShortPathSegment(username);
-      const { data: user } = await supabase
-        .from('short_users')
-        .select('id')
-        .eq('username', normalizedUsername)
-        .single();
+      const owner = await resolveOwnerCode(supabase, normalizedUsername);
 
-      if (!user) {
+      if (!owner) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
 
@@ -40,7 +37,7 @@ export async function GET(request) {
           'id, original_url, type, code, file_name, file_path, file_mime, link_password_hash, link_password_unlock_version, expiration_date'
         )
         .eq('code', normalizedCode)
-        .eq('user_id', user.id)
+        .eq('user_code_id', owner.codeId)
         .single();
 
       urlData = data;

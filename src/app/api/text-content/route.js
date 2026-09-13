@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment } from '@/lib/pathSegments';
 import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
+import { resolveOwnerCode } from '@/lib/userCodes';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -21,13 +22,9 @@ export async function GET(request) {
 
     if (username) {
       const normalizedUsername = normalizeShortPathSegment(username);
-      const { data: user } = await supabase
-        .from('short_users')
-        .select('id')
-        .eq('username', normalizedUsername)
-        .single();
+      const owner = await resolveOwnerCode(supabase, normalizedUsername);
 
-      if (!user) {
+      if (!owner) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
 
@@ -35,7 +32,7 @@ export async function GET(request) {
         .from('short_urls')
         .select('text_content, type, code, link_password_hash, link_password_unlock_version')
         .eq('code', normalizedCode)
-        .eq('user_id', user.id)
+        .eq('user_code_id', owner.codeId)
         .single();
 
       urlData = data;
