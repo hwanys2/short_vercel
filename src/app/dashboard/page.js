@@ -4,18 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import UrlForm from '@/components/UrlForm';
 import UrlResult from '@/components/UrlResult';
 import { buildShortUrl } from '@/lib/siteUrl';
-import {
-  formatFileSize,
-  MAX_FILE_BYTES,
-  getFileCapacityRetentionInfo,
-} from '@/lib/shortFilesShared';
-import { uploadShortFileAuto } from '@/lib/fileUploadClient';
-import { useLinkScope, parseScopeSelectValue } from '@/lib/useLinkScope';
+import { useLinkScope } from '@/lib/useLinkScope';
 import {
   TEMP_SCOPE,
-  TEMP_LINK_DURATION_OPTIONS,
   formatTempExpiryDate,
   formatTempRemaining,
 } from '@/lib/tempLinks';
@@ -35,65 +29,10 @@ export default function DashboardPage() {
   const [filterType, setFilterType] = useState('all');
   const [fileStatus, setFileStatus] = useState('all');
   const [filterCodeId, setFilterCodeId] = useState('all'); // 'all' | 'temp' | number
-
-  // 생성 대상: 본인 코드(영구) 또는 임시 주소(숏.한국/코드)
-  const {
-    scope: createScope,
-    isTemp: createIsTemp,
-    codes: userCodes,
-    activeUsername: createUsername,
-    setScope: setCreateScope,
-    selectValue: createScopeValue,
-  } = useLinkScope(user);
-  const [newExpireDuration, setNewExpireDuration] = useState('1week');
-
-  // 새 URL 생성 폼
-  const [newUrl, setNewUrl] = useState('');
-  const [newCode, setNewCode] = useState('');
-  const [newMode, setNewMode] = useState('url');
-  const [newText, setNewText] = useState('');
-  const [newFile, setNewFile] = useState(null);
-  const [creating, setCreating] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(null);
   const [createResult, setCreateResult] = useState(null);
-  const abortControllerRef = useRef(null);
   const createResultRef = useRef(null);
 
-  // 업로드 도중 창 닫기/새로고침 방지
-  useEffect(() => {
-    if (!creating || !uploadProgress) return;
-    const handleBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [creating, uploadProgress]);
-
-  const handleCancelUpload = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  };
-
-  const handleFileChange = (file) => {
-    setMessage('');
-    setNewFile(file);
-    if (!file) return;
-
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const blockedExts = ['exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'dll', 'sys', 'apk', 'dmg', 'pkg', 'iso', 'sh', 'ps1', 'vbs', 'jar', 'js', 'mjs', 'cjs', 'php', 'asp', 'aspx', 'jsp', 'cgi', 'svg'];
-    if (ext && blockedExts.includes(ext)) {
-      setMessage('보안상 직접 실행 파일(.exe, .apk, .dmg 등) 및 스크립트는 업로드할 수 없습니다. 프로그램 공유는 ZIP 압축 파일로 묶어서 업로드해주세요.');
-      setMessageType('danger');
-      setNewFile(null);
-      const fileInput = document.getElementById('dash-file');
-      if (fileInput) fileInput.value = '';
-    }
-  };
+  const { codes: userCodes, activeUsername: createUsername } = useLinkScope(user);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://숏.한국/';
 
@@ -124,17 +63,6 @@ export default function DashboardPage() {
   const hasMultipleCodes = userCodes.length > 1;
   const hasScopeFilter = filterCodeId !== 'all';
   const hasAnyFilter = Boolean(appliedQ) || filterType !== 'all' || fileStatus !== 'all' || hasScopeFilter;
-
-  // 임시 주소 + 파일: 용량별 보관 기간이 우선 (10MB 초과는 선택 불가)
-  const newFileForcedDuration =
-    newMode === 'file' && newFile
-      ? newFile.size > 1024 * 1024 * 1024
-        ? '48h'
-        : newFile.size > 10 * 1024 * 1024
-          ? '1week'
-          : null
-      : null;
-  const showCreateDuration = createIsTemp && !(newMode === 'file' && newFileForcedDuration);
 
   const fetchUrls = async () => {
     setLoading(true);
@@ -174,124 +102,9 @@ export default function DashboardPage() {
     return () => cancelAnimationFrame(id);
   }, [createResult]);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    setCreating(true);
-    setMessage('');
-    setCreateResult(null);
-    try {
-      if (newMode === 'file') {
-        if (!newFile) {
-          setMessage('파일을 선택해주세요.');
-          setMessageType('danger');
-          setCreating(false);
-          return;
-        }
-        if (newFile.size > MAX_FILE_BYTES) {
-          setMessage(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
-          setMessageType('danger');
-          setCreating(false);
-          return;
-        }
-
-        // 본인 코드: 용량별 보관 기간 / 임시 주소: 10MB 이하는 선택 기간, 초과는 용량별 강제
-        const fileExpireDuration =
-          newFileForcedDuration || (createIsTemp ? newExpireDuration : '1month');
-
-        const abortController = new AbortController();
-        abortControllerRef.current = abortController;
-
-        const uploaded = await uploadShortFileAuto({
-          file: newFile,
-          customCode: newCode.trim(),
-          codeId: createScope,
-          expireDuration: fileExpireDuration,
-          linkPasswordEnabled: false,
-          onProgress: (prog) => {
-            setUploadProgress(prog);
-          },
-          signal: abortController.signal,
-        });
-
-        const resultData =
-          uploaded?.data ||
-          (uploaded?.short_url
-            ? uploaded
-            : {
-                short_url: buildShortUrl({
-                  baseUrl,
-                  code: newCode.trim(),
-                  username: createIsTemp ? undefined : createUsername,
-                }),
-                type: 'file',
-                is_temp: createIsTemp,
-                expiration_date: null,
-              });
-
-        setCreateResult(resultData);
-        setMessage('');
-        setNewCode('');
-        setNewFile(null);
-        if (document.getElementById('dash-file')) {
-          document.getElementById('dash-file').value = '';
-        }
-        fetchUrls();
-        return;
-      }
-
-      const body = {
-        custom_code: newCode,
-        type: newMode,
-        code_id: createScope,
-      };
-      if (createIsTemp) body.expire_duration = newExpireDuration;
-      if (newMode === 'url') {
-        body.original_url = newUrl;
-      } else {
-        body.text_content = newText;
-      }
-      const res = await fetch('/api/urls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const resultData =
-          data.data ||
-          {
-            short_url: buildShortUrl({
-              baseUrl,
-              code: newCode.trim(),
-              username: createIsTemp ? undefined : createUsername,
-            }),
-            type: newMode,
-            is_temp: createIsTemp,
-            expiration_date: null,
-          };
-        setCreateResult(resultData);
-        setMessage('');
-        setNewUrl('');
-        setNewCode('');
-        setNewText('');
-        fetchUrls();
-      } else {
-        setMessage(data.message);
-        setMessageType('danger');
-      }
-    } catch (err) {
-      if (err?.name === 'AbortError' || err?.message?.includes('취소')) {
-        setMessage('파일 업로드가 취소되었습니다.');
-        setMessageType('warning');
-      } else {
-        setMessage(err?.message || '오류가 발생했습니다.');
-        setMessageType('danger');
-      }
-    } finally {
-      abortControllerRef.current = null;
-      setCreating(false);
-      setUploadProgress(null);
-    }
+  const handleCreateResult = (data) => {
+    setCreateResult(data);
+    fetchUrls();
   };
 
   /** 행의 스코프 파라미터: 임시 주소면 'temp', 아니면 본인 코드 id */
@@ -374,219 +187,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* 새 URL 생성 */}
-          <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
-            <div className="card-header">➕ 새 단축 주소 생성</div>
-            <div className="card-body">
-              <div className="mode-tabs" role="tablist" aria-label="입력 모드 선택" style={{ marginBottom: '16px' }}>
-                <button type="button" role="tab" className={`mode-tab ${newMode === 'url' ? 'is-active' : ''}`} aria-selected={newMode === 'url'} aria-label="URL 단축" onClick={() => setNewMode('url')}>
-                  <span className="mode-tab-icon" aria-hidden="true">🔗</span>
-                  <span className="mode-tab-text">
-                    <span className="mode-tab-text-full">URL 단축</span>
-                    <span className="mode-tab-text-short">URL</span>
-                  </span>
-                </button>
-                <button type="button" role="tab" className={`mode-tab ${newMode === 'text' ? 'is-active' : ''}`} aria-selected={newMode === 'text'} aria-label="텍스트 공유" onClick={() => setNewMode('text')}>
-                  <span className="mode-tab-icon" aria-hidden="true">📋</span>
-                  <span className="mode-tab-text">
-                    <span className="mode-tab-text-full">텍스트 공유</span>
-                    <span className="mode-tab-text-short">텍스트</span>
-                  </span>
-                </button>
-                <button type="button" role="tab" className={`mode-tab ${newMode === 'file' ? 'is-active' : ''}`} aria-selected={newMode === 'file'} aria-label="파일 공유" onClick={() => setNewMode('file')}>
-                  <span className="mode-tab-icon" aria-hidden="true">📎</span>
-                  <span className="mode-tab-text">
-                    <span className="mode-tab-text-full">파일 공유</span>
-                    <span className="mode-tab-text-short">파일</span>
-                  </span>
-                </button>
-              </div>
-              <form onSubmit={handleCreate} className="dashboard-create-form">
-                {newMode === 'url' ? (
-                  <div className="form-group dashboard-create-main">
-                    <label className="form-label" htmlFor="dash-url">원본 URL</label>
-                    <input id="dash-url" type="url" className="form-input" placeholder="https://example.com" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} required />
-                  </div>
-                ) : newMode === 'text' ? (
-                  <div className="form-group dashboard-create-main">
-                    <label className="form-label" htmlFor="dash-text">공유할 텍스트</label>
-                    <textarea id="dash-text" className="form-input form-textarea" placeholder="프롬프트, 코드, 메시지 등" value={newText} onChange={(e) => setNewText(e.target.value)} required rows={3} maxLength={50000} />
-                  </div>
-                ) : (
-                  <div className="form-group dashboard-create-main">
-                    <label className="form-label" htmlFor="dash-file">
-                      공유할 파일 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>(최대 5GB 지원)</span>
-                    </label>
-                    <input
-                      id="dash-file"
-                      type="file"
-                      className="form-input"
-                      onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-                      required
-                    />
-
-                    {newFile && (() => {
-                      const info = getFileCapacityRetentionInfo(newFile.size, !createIsTemp);
-                      const afterExpiry = createIsTemp
-                        ? '임시 주소이므로 만료 시 주소도 함께 삭제됩니다'
-                        : '주소는 유지되며 만료 시 수정에서 재등록 가능';
-                      return (
-                        <div
-                          style={{
-                            marginTop: '10px',
-                            padding: '10px 12px',
-                            background: info.bgColor,
-                            border: `1px solid ${info.borderColor}`,
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{ fontWeight: '600', wordBreak: 'break-all' }}>{newFile.name}</span>
-                            <span style={{ fontWeight: '700', color: info.color, marginLeft: '8px', whiteSpace: 'nowrap' }}>
-                              {formatFileSize(newFile.size)} ({info.badge})
-                            </span>
-                          </div>
-                          <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.4', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
-                            <span>⏱️</span>
-                            <span><strong>보관 및 삭제 안내:</strong> {info.notice}</span>
-                          </div>
-                          {newFile.size > 1024 * 1024 * 1024 && (
-                            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(239, 68, 68, 0.3)', color: '#ef4444', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 다운로드 가능 기간: <strong>2일 (48시간 후 만료)</strong> — {afterExpiry}
-                            </div>
-                          )}
-                          {newFile.size > 10 * 1024 * 1024 && newFile.size <= 1024 * 1024 * 1024 && (
-                            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', color: '#047857', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 다운로드 가능 기간: <strong>7일 (1주일 후 만료)</strong> — {afterExpiry}
-                            </div>
-                          )}
-                          {newFile.size <= 10 * 1024 * 1024 && (
-                            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(37, 99, 235, 0.3)', color: '#2563eb', fontWeight: 600, fontSize: '0.82rem' }}>
-                              🔒 다운로드 가능 기간: <strong>{createIsTemp ? '선택한 만료 기간 (최대 30일)' : '30일 (1개월 후 만료)'}</strong> — {afterExpiry}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    <p className="url-form-file-hint" style={{ marginTop: '6px' }}>
-                      최대 5GB까지 모든 파일(영상, 문서, ZIP 등) 지원. 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과는 2일간 보관 후 자동 삭제됩니다.
-                      {createIsTemp ? ' (임시 주소는 만료 시 주소도 삭제)' : ' (단축 주소는 영구 유지)'}
-                    </p>
-                  </div>
-                )}
-                <div className="form-group dashboard-create-code">
-                  <label className="form-label" htmlFor="dash-code">단축 코드</label>
-                  <div className="dashboard-create-code-row">
-                    <select
-                      className={`form-input dashboard-create-code-select${createIsTemp ? ' is-temp' : ''}`}
-                      aria-label="주소 형태 선택 (내 코드 또는 임시 주소)"
-                      value={createScopeValue}
-                      onChange={(e) => setCreateScope(parseScopeSelectValue(e.target.value))}
-                    >
-                      {userCodes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.username}/
-                        </option>
-                      ))}
-                      <option value={TEMP_SCOPE}>임시 · 숏.한국/</option>
-                    </select>
-                    <input
-                      id="dash-code"
-                      type="text"
-                      className="form-input"
-                      placeholder="원하는코드"
-                      value={newCode}
-                      onChange={(e) => setNewCode(e.target.value)}
-                      required
-                      pattern={"[가-힣a-zA-Z0-9_\\-]+"}
-                      title="한글, 영문, 숫자, 밑줄(_), 하이픈(-)만 사용 가능"
-                    />
-                  </div>
-                </div>
-
-                {createIsTemp && (
-                  <div className="form-group dashboard-create-duration">
-                    <label className="form-label">임시 주소 만료 기간</label>
-                    {showCreateDuration ? (
-                      <div className="duration-options" style={{ justifyContent: 'flex-start' }}>
-                        {TEMP_LINK_DURATION_OPTIONS.map((opt) => (
-                          <div key={opt.value} className="duration-option">
-                            <input
-                              type="radio"
-                              id={`dash-dur-${opt.value}`}
-                              name="dash_expire_duration"
-                              value={opt.value}
-                              checked={newExpireDuration === opt.value}
-                              onChange={(e) => setNewExpireDuration(e.target.value)}
-                            />
-                            <label htmlFor={`dash-dur-${opt.value}`}>{opt.label}</label>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="dashboard-create-duration-hint" style={{ marginTop: 0 }}>
-                        🔒 {newFileForcedDuration === '48h' ? '1GB 초과 파일은 2일(48시간)' : '10MB 초과 파일은 7일(1주일)'} 후 자동 만료됩니다.
-                      </p>
-                    )}
-                    <p className="dashboard-create-duration-hint">
-                      ⏳ 임시 주소는 내 코드 없이 <strong>{baseUrl}코드</strong> 형태로 만들어지며, 만료되면 자동 삭제됩니다. 만료 전 수정에서 기간을 다시 설정하거나 내 코드 주소로 전환할 수 있어요.
-                    </p>
-                  </div>
-                )}
-
-                {uploadProgress && (
-                  <div style={{ width: '100%', margin: '12px 0', padding: '12px', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '6px', border: '1px solid var(--border-color, #e2e8f0)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-                      <span>{uploadProgress.statusText}</span>
-                      <span style={{ color: '#2563eb' }}>{uploadProgress.percent}%</span>
-                    </div>
-                    <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          width: `${uploadProgress.percent}%`,
-                          height: '100%',
-                          background: 'linear-gradient(90deg, #3b82f6, #10b981)',
-                          transition: 'width 0.2s ease',
-                        }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={handleCancelUpload}
-                        style={{
-                          padding: '3px 8px',
-                          fontSize: '0.75rem',
-                          background: 'none',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '4px',
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                          transition: 'all 0.15s ease',
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef4444'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                      >
-                        ✕ 업로드 취소
-                      </button>
-                      {uploadProgress.detailText && (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', textAlign: 'right' }}>
-                          {uploadProgress.detailText}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <button type="submit" className="btn btn-primary dashboard-create-submit" disabled={creating}>
-                  {creating ? (uploadProgress?.statusText || '생성 중...') : '생성'}
-                </button>
-              </form>
-            </div>
-          </div>
+          <UrlForm user={user} onResult={handleCreateResult} />
 
 
           {/* URL 목록 */}
