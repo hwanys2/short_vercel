@@ -24,6 +24,7 @@ import {
   SEND_DELAY_MS,
 } from '@/lib/mailing/email';
 import { isRecipientEligible } from '@/lib/mailing/recipients';
+import { isValidEmail } from '@/lib/authBridge';
 import { getSiteOrigin } from '@/lib/siteUrl';
 
 const DEFAULT_LOOP_MAX_MS = 280_000;
@@ -208,6 +209,21 @@ export async function processCampaignBatch(admin, campaignId, { deadlineAt = Num
             .eq('id', recipient.id)
             .in('status', ['pending', 'failed'])
         );
+
+        if (!isValidEmail(recipient.email)) {
+          await withDbRetry(() =>
+            admin
+              .from(RECIPIENT_TABLE)
+              .update({
+                status: 'skipped',
+                last_error: 'invalid_email_format',
+                updated_at: nowIso(),
+              })
+              .eq('id', recipient.id)
+          );
+          batchProcessed += 1;
+          continue;
+        }
 
         const eligible = await isRecipientEligible(admin, {
           userId: recipient.user_id,

@@ -1,4 +1,5 @@
 import { ADMIN_EMAILS, isAdminEmail } from '@/lib/admin';
+import { isValidEmail } from '@/lib/authBridge';
 
 const PAGE_SIZE = 500;
 const INSERT_BATCH_SIZE = 500;
@@ -15,13 +16,13 @@ export async function collectAllRecipients(admin, { audience }) {
   const seenEmails = new Set();
   let offset = 0;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     let query = admin
       .from('short_users')
       .select('id, email')
       .not('email', 'is', null)
       .neq('email', '')
+      .like('email', '%@%.%')
       .order('id', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
@@ -40,6 +41,7 @@ export async function collectAllRecipients(admin, { audience }) {
         .trim()
         .toLowerCase();
       if (!email || seenEmails.has(email)) continue;
+      if (!isValidEmail(email)) continue;
       if (audience === 'admin' && !isAdminEmail(email)) continue;
       seenEmails.add(email);
       allUsers.push({ user_id: u.id, email });
@@ -60,7 +62,7 @@ export async function isRecipientEligible(admin, { userId, audience }) {
     .maybeSingle();
 
   const { data: user, error } = await query;
-  if (error || !user?.email) return false;
+  if (error || !user?.email || !isValidEmail(user.email)) return false;
 
   if (audience === 'optional' && user.accepts_optional_mail === false) {
     return false;
@@ -94,7 +96,8 @@ export async function countAudienceMembers(admin, audience) {
     .from('short_users')
     .select('*', { count: 'exact', head: true })
     .not('email', 'is', null)
-    .neq('email', '');
+    .neq('email', '')
+    .like('email', '%@%.%');
 
   if (audience === 'optional') {
     query = query.eq('accepts_optional_mail', true);

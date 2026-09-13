@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { resolveAppUser } from '@/lib/session';
-import { validateUsername, normalizeEmail } from '@/lib/authBridge';
+import { validateUsername, normalizeEmail, isValidEmail } from '@/lib/authBridge';
 
 export async function POST(request) {
   try {
@@ -37,9 +37,9 @@ export async function POST(request) {
 
     const cleanUsername = usernameCheck.username;
     const email = normalizeEmail(sessionUser.email);
-    if (!email) {
+    if (!email || !isValidEmail(email)) {
       return NextResponse.json(
-        { success: false, message: '이메일 정보를 확인할 수 없습니다.' },
+        { success: false, message: '유효한 이메일 정보를 확인할 수 없습니다.' },
         { status: 400 }
       );
     }

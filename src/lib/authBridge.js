@@ -39,6 +39,48 @@ export function normalizeEmail(email) {
     .trim();
 }
 
+/**
+ * 이메일 주소의 유효성을 엄격하게 검증합니다.
+ * - 형식에 맞지 않는 이메일(도메인에 점 누락, 허용되지 않는 문자, TLD 누락/숫자 TLD 등)을 배제합니다.
+ * - 예: qwertyuiop111@1111, nakivabg@jhxjkdwjkdwed, sh.lee557@genedu, dfa@1, b@01086821625, 5406@5406, nnnn@jj 등 무효 처리
+ */
+export function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim().toLowerCase();
+  if (trimmed.length > 254 || trimmed.length < 5) return false;
+  if (/\s/.test(trimmed)) return false;
+
+  const atIndex = trimmed.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === trimmed.length - 1) return false;
+
+  const local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+
+  if (local.includes('@')) return false;
+  if (local.length > 64) return false;
+  if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+  if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~가-힣-]+$/.test(local)) return false;
+
+  if (!domain.includes('.')) return false;
+  if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return false;
+
+  const domainParts = domain.split('.');
+  if (domainParts.length < 2) return false;
+
+  for (const part of domainParts) {
+    if (!part || part.length > 63) return false;
+    if (part.startsWith('-') || part.endsWith('-')) return false;
+    if (!/^[a-zA-Z0-9가-힣-]+$/.test(part)) return false;
+  }
+
+  const tld = domainParts[domainParts.length - 1];
+  if (!/^(xn--[a-zA-Z0-9]+|[a-zA-Z]{2,}|[가-힣]{1,})$/.test(tld)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function normalizeUsernameInput(username) {
   const trimmed = String(username || '').trim();
   try {

@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { getSiteOrigin } from '@/lib/siteUrl';
+import { isValidEmail } from '@/lib/authBridge';
 
 const SMTP_USER = process.env.AWS_SES_SMTP_USER;
 const SMTP_PASS = process.env.AWS_SES_SMTP_PASS;
@@ -122,6 +123,9 @@ export function sleep(ms) {
 }
 
 export async function sendOneEmail(transporter, { to, subject, html }) {
+  if (!isValidEmail(to)) {
+    throw new Error(`유효하지 않은 이메일 형식입니다: ${to}`);
+  }
   await transporter.sendMail({
     from: FROM_HEADER,
     to,

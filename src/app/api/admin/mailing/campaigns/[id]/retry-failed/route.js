@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
+import { isValidEmail } from '@/lib/authBridge';
 import {
   getCampaign,
   updateCampaign,
+  refreshCampaignCounts,
   mapCampaignToApi,
   RECIPIENT_TABLE,
   nowIso,
@@ -35,7 +37,7 @@ export async function POST(request, { params }) {
 
     const { data: failedRows, error: fErr } = await admin
       .from(RECIPIENT_TABLE)
-      .select('id')
+      .select('id, email')
       .eq('campaign_id', campaignId)
       .eq('status', 'failed');
     if (fErr) throw fErr;
@@ -47,6 +49,32 @@ export async function POST(request, { params }) {
       );
     }
 
+    const invalidRowIds = failedRows.filter((r) => !isValidEmail(r.email)).map((r) => r.id);
+    const validRowIds = failedRows.filter((r) => isValidEmail(r.email)).map((r) => r.id);
+
+    if (invalidRowIds.length > 0) {
+      await admin
+        .from(RECIPIENT_TABLE)
+        .update({
+          status: 'skipped',
+          last_error: 'invalid_email_format',
+          updated_at: nowIso(),
+        })
+        .in('id', invalidRowIds);
+    }
+
+    if (validRowIds.length === 0) {
+      await refreshCampaignCounts(admin, campaignId);
+      const finalCampaign = await getCampaign(admin, campaignId);
+      return NextResponse.json({
+        success: true,
+        resetCount: 0,
+        skippedInvalidCount: invalidRowIds.length,
+        message: '형식에 맞지 않는 이메일은 건너뜀(skipped) 처리되었습니다. 유효한 재발송 대상이 없습니다.',
+        campaign: mapCampaignToApi(finalCampaign),
+      });
+    }
+
     const { error: uErr } = await admin
       .from(RECIPIENT_TABLE)
       .update({
@@ -55,8 +83,7 @@ export async function POST(request, { params }) {
         last_error: null,
         updated_at: nowIso(),
       })
-      .eq('campaign_id', campaignId)
-      .eq('status', 'failed');
+      .in('id', validRowIds);
     if (uErr) throw uErr;
 
     await updateCampaign(admin, campaignId, {
@@ -68,10 +95,12 @@ export async function POST(request, { params }) {
 
     scheduleCampaignWorker(admin, campaignId);
 
+    await refreshCampaignCounts(admin, campaignId);
     const finalCampaign = await getCampaign(admin, campaignId);
     return NextResponse.json({
       success: true,
-      resetCount: failedRows.length,
+      resetCount: validRowIds.length,
+      skippedInvalidCount: invalidRowIds.length,
       campaign: mapCampaignToApi(finalCampaign),
     });
   } catch (err) {
