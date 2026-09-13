@@ -330,13 +330,20 @@ export default function AdminMailingPage() {
             >
               발송 내역
             </button>
-            <Link
-              href="/admin/slots"
-              className="btn btn-sm btn-secondary"
-              style={{ marginLeft: 'auto' }}
-            >
-              본인코드 슬롯 관리 →
-            </Link>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <Link
+                href="/admin/link-account"
+                className="btn btn-sm btn-secondary"
+              >
+                구글 계정 연동
+              </Link>
+              <Link
+                href="/admin/slots"
+                className="btn btn-sm btn-secondary"
+              >
+                본인코드 슬롯 관리 →
+              </Link>
+            </div>
           </div>
 
           {statusMsg && activeTab === 'compose' && (

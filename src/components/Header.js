@@ -93,6 +93,27 @@ function IconKey({ size = 16 }) {
   );
 }
 
+function IconLink({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function IconLogout({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -310,6 +331,17 @@ export default function Header() {
                                 코드 슬롯 관리
                               </Link>
                               <Link
+                                href="/admin/link-account"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconLink />
+                                </MenuItemIcon>
+                                구글 계정 연동
+                              </Link>
+                              <Link
                                 href="/admin/mailing"
                                 className="account-dropdown-item"
                                 role="menuitem"
@@ -359,6 +391,17 @@ export default function Header() {
                                   <IconKey />
                                 </MenuItemIcon>
                                 코드 슬롯 관리
+                              </Link>
+                              <Link
+                                href="/admin/link-account"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconLink />
+                                </MenuItemIcon>
+                                구글 계정 연동
                               </Link>
                               <Link
                                 href="/admin/mailing"

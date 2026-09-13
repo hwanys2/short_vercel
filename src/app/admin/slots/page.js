@@ -234,9 +234,12 @@ export default function AdminSlotsPage() {
           </div>
 
           {/* 관리자 서브 탭 바로가기 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap' }}>
             <Link href="/admin/slots" className="btn btn-sm btn-primary">
               코드 슬롯 관리
+            </Link>
+            <Link href="/admin/link-account" className="btn btn-sm btn-secondary">
+              구글 계정 연동
             </Link>
             <Link href="/admin/mailing" className="btn btn-sm btn-secondary">
               단체 메일 발송 →
