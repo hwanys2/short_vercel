@@ -153,14 +153,36 @@ export async function GET(request) {
       // 최근 생성 단축 URL 6건
       admin
         .from('short_urls')
-        .select('id, code, original_url, type, visits, created_at, user_id')
+        .select(`
+          id,
+          code,
+          original_url,
+          type,
+          visits,
+          created_at,
+          user_id,
+          user_code_id,
+          short_user_codes(username),
+          short_users!short_urls_user_id_fkey(username)
+        `)
         .order('created_at', { ascending: false })
         .limit(6),
 
       // 누적 최다 방문 TOP 6 URL
       admin
         .from('short_urls')
-        .select('id, code, original_url, type, visits, created_at, user_id')
+        .select(`
+          id,
+          code,
+          original_url,
+          type,
+          visits,
+          created_at,
+          user_id,
+          user_code_id,
+          short_user_codes(username),
+          short_users!short_urls_user_id_fkey(username)
+        `)
         .order('visits', { ascending: false })
         .limit(6),
     ]);
@@ -271,6 +293,27 @@ export async function GET(request) {
     const yesterdayUsers = yesterdayUsersCountResult.count || 0;
     const yesterdayUrls = yesterdayUrlsCountResult.count || 0;
 
+    const formatUrlRow = (l) => {
+      const username = l.short_user_codes?.username || l.short_users?.username || null;
+      const shortPath = username ? `${username}/${l.code}/` : `${l.code}/`;
+      return {
+        id: l.id,
+        code: l.code,
+        username,
+        shortDisplay: `숏.한국/${shortPath}`,
+        shortUrl: `https://숏.한국/${shortPath}`,
+        original_url: l.original_url,
+        type: l.type || 'url',
+        visits: l.visits || 0,
+        created_at: l.created_at,
+        user_id: l.user_id,
+        is_member: Boolean(l.user_id),
+      };
+    };
+
+    const recentUrls = (recentUrlsResult.data || []).map(formatUrlRow);
+    const topUrls = (topUrlsResult.data || []).map(formatUrlRow);
+
     return NextResponse.json({
       success: true,
       period,
@@ -315,8 +358,8 @@ export async function GET(request) {
       },
       timeSeries,
       recentUsers: recentUsersResult.data || [],
-      recentUrls: recentUrlsResult.data || [],
-      topUrls: topUrlsResult.data || [],
+      recentUrls,
+      topUrls,
     });
   } catch (err) {
     console.error('admin/dashboard error:', err);

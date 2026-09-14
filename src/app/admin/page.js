@@ -149,6 +149,27 @@ function IconDownload({ size = 14 }) {
   );
 }
 
+function IconExternalLink({ size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path
+        d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15 3h6v6M10 14L21 3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [authState, setAuthState] = useState('loading'); // loading | ok | denied
@@ -1134,58 +1155,85 @@ export default function AdminDashboardPage() {
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>실시간 최신순</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {(data.recentUrls || []).slice(0, 5).map((l) => (
-                      <div
-                        key={l.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '8px 10px',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--surface)',
-                          fontSize: '0.85rem',
-                        }}
-                      >
-                        <div style={{ minWidth: 0, paddingRight: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <strong style={{ color: 'var(--primary)' }}>/{l.code}</strong>
-                            <span
+                    {(data.recentUrls || []).slice(0, 5).map((l) => {
+                      const displayUrl = l.shortDisplay || (l.username ? `숏.한국/${l.username}/${l.code}/` : `숏.한국/${l.code}/`);
+                      const targetUrl = l.shortUrl || `https://${displayUrl}`;
+                      return (
+                        <div
+                          key={l.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--surface)',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          <div style={{ minWidth: 0, paddingRight: 8, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <a
+                                href={targetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  color: 'var(--primary)',
+                                  fontWeight: 700,
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  wordBreak: 'break-all',
+                                  transition: 'color 0.2s',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                title={`${displayUrl} (클릭 시 새 창 이동)`}
+                              >
+                                <span>{displayUrl}</span>
+                                <IconExternalLink size={12} />
+                              </a>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  background: l.user_id ? 'rgba(94, 105, 235, 0.12)' : 'rgba(103, 212, 232, 0.15)',
+                                  color: l.user_id ? 'var(--primary)' : '#0284c7',
+                                  fontWeight: 600,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {l.user_id ? '회원' : '게스트'}
+                              </span>
+                            </div>
+                            <div
                               style={{
-                                fontSize: '0.7rem',
-                                padding: '1px 5px',
-                                borderRadius: 4,
-                                background: l.user_id ? 'rgba(94, 105, 235, 0.12)' : 'rgba(103, 212, 232, 0.15)',
-                                color: l.user_id ? 'var(--primary)' : '#0284c7',
-                                fontWeight: 600,
+                                fontSize: '0.75rem',
+                                color: 'var(--text-muted)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: 240,
+                                marginTop: 2,
                               }}
+                              title={l.original_url}
                             >
-                              {l.user_id ? '회원' : '게스트'}
-                            </span>
+                              {l.original_url}
+                            </div>
                           </div>
-                          <div
-                            style={{
-                              fontSize: '0.75rem',
-                              color: 'var(--text-muted)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              maxWidth: 180,
-                            }}
-                          >
-                            {l.original_url}
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {formatDate(l.created_at)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              클릭 {l.visits || 0}회
+                            </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {formatDate(l.created_at)}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                            클릭 {l.visits || 0}회
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1203,69 +1251,110 @@ export default function AdminDashboardPage() {
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>누적 방문 순위</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {(data.topUrls || []).slice(0, 5).map((l, idx) => (
-                      <div
-                        key={l.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '8px 10px',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--surface)',
-                          fontSize: '0.85rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, paddingRight: 8 }}>
-                          <span
-                            style={{
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              background: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : 'var(--border)',
-                              color: idx < 3 ? '#fff' : 'var(--text-muted)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {idx + 1}
-                          </span>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, color: 'var(--primary)' }}>/{l.code}</div>
-                            <div
+                    {(data.topUrls || []).slice(0, 5).map((l, idx) => {
+                      const displayUrl = l.shortDisplay || (l.username ? `숏.한국/${l.username}/${l.code}/` : `숏.한국/${l.code}/`);
+                      const targetUrl = l.shortUrl || `https://${displayUrl}`;
+                      return (
+                        <div
+                          key={l.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--surface)',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, paddingRight: 8, flex: 1 }}>
+                            <span
                               style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: '50%',
+                                background: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : 'var(--border)',
+                                color: idx < 3 ? '#fff' : 'var(--text-muted)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 fontSize: '0.75rem',
-                                color: 'var(--text-muted)',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                maxWidth: 170,
+                                fontWeight: 700,
+                                flexShrink: 0,
                               }}
                             >
-                              {l.original_url}
+                              {idx + 1}
+                            </span>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <a
+                                  href={targetUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: 'var(--primary)',
+                                    fontWeight: 700,
+                                    textDecoration: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    wordBreak: 'break-all',
+                                    transition: 'color 0.2s',
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                  title={`${displayUrl} (클릭 시 새 창 이동)`}
+                                >
+                                  <span>{displayUrl}</span>
+                                  <IconExternalLink size={12} />
+                                </a>
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                    background: l.user_id ? 'rgba(94, 105, 235, 0.12)' : 'rgba(103, 212, 232, 0.15)',
+                                    color: l.user_id ? 'var(--primary)' : '#0284c7',
+                                    fontWeight: 600,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {l.user_id ? '회원' : '게스트'}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-muted)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  maxWidth: 220,
+                                  marginTop: 2,
+                                }}
+                                title={l.original_url}
+                              >
+                                {l.original_url}
+                              </div>
                             </div>
                           </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <span
+                              style={{
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                color: 'var(--success)',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              {(l.visits || 0).toLocaleString()}회
+                            </span>
+                          </div>
                         </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <span
-                            style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              color: 'var(--success)',
-                              background: 'rgba(16, 185, 129, 0.1)',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            {(l.visits || 0).toLocaleString()}회
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
