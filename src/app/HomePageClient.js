@@ -18,7 +18,7 @@ export default function HomePageClient() {
     total: 0,
     today: 0,
     users: 0,
-    byType: { url: 0, text: 0, file: 0 },
+    byType: { url: 0, text: 0, file: 0, html: 0 },
   });
   const [statsReady, setStatsReady] = useState(false);
   const resultAnchorRef = useRef(null);
@@ -68,7 +68,7 @@ export default function HomePageClient() {
               <br />
               짧은 URL
             </h1>
-            <p className="hero-subtitle">긴 URL·텍스트·파일을 한글로 짧게 공유하세요.</p>
+            <p className="hero-subtitle">긴 URL·텍스트·파일·웹페이지를 한글로 짧게 공유하세요.</p>
           </div>
         </section>
 
@@ -121,20 +121,57 @@ export default function HomePageClient() {
                 </div>
               </div>
               {statsReady && (
-                <ul className="stats-breakdown" aria-label="활성 URL 유형별 개수">
-                  <li>
-                    <span className="stats-breakdown-label">URL 단축</span>
-                    <span className="stats-breakdown-count">{(stats.byType?.url ?? 0).toLocaleString()}</span>
-                  </li>
-                  <li>
-                    <span className="stats-breakdown-label">텍스트 공유</span>
-                    <span className="stats-breakdown-count">{(stats.byType?.text ?? 0).toLocaleString()}</span>
-                  </li>
-                  <li>
-                    <span className="stats-breakdown-label">파일 공유</span>
-                    <span className="stats-breakdown-count">{(stats.byType?.file ?? 0).toLocaleString()}</span>
-                  </li>
-                </ul>
+                <div className="stats-breakdown-wrapper">
+                  <div className="stats-breakdown-header">
+                    <span className="stats-breakdown-badge">유형별 현황</span>
+                  </div>
+                  <ul className="stats-breakdown-grid" aria-label="활성 URL 유형별 개수">
+                    <li className="stats-breakdown-card is-url">
+                      <div className="stats-breakdown-icon-wrap" aria-hidden="true">
+                        <span className="stats-breakdown-icon">🔗</span>
+                      </div>
+                      <div className="stats-breakdown-info">
+                        <span className="stats-breakdown-label">URL 단축</span>
+                        <span className="stats-breakdown-count">
+                          <AnimatedNumber value={stats.byType?.url ?? 0} />
+                        </span>
+                      </div>
+                    </li>
+                    <li className="stats-breakdown-card is-text">
+                      <div className="stats-breakdown-icon-wrap" aria-hidden="true">
+                        <span className="stats-breakdown-icon">📋</span>
+                      </div>
+                      <div className="stats-breakdown-info">
+                        <span className="stats-breakdown-label">텍스트 공유</span>
+                        <span className="stats-breakdown-count">
+                          <AnimatedNumber value={stats.byType?.text ?? 0} />
+                        </span>
+                      </div>
+                    </li>
+                    <li className="stats-breakdown-card is-file">
+                      <div className="stats-breakdown-icon-wrap" aria-hidden="true">
+                        <span className="stats-breakdown-icon">📎</span>
+                      </div>
+                      <div className="stats-breakdown-info">
+                        <span className="stats-breakdown-label">파일 공유</span>
+                        <span className="stats-breakdown-count">
+                          <AnimatedNumber value={stats.byType?.file ?? 0} />
+                        </span>
+                      </div>
+                    </li>
+                    <li className="stats-breakdown-card is-html">
+                      <div className="stats-breakdown-icon-wrap" aria-hidden="true">
+                        <span className="stats-breakdown-icon">🌐</span>
+                      </div>
+                      <div className="stats-breakdown-info">
+                        <span className="stats-breakdown-label">웹페이지 (HTML)</span>
+                        <span className="stats-breakdown-count">
+                          <AnimatedNumber value={stats.byType?.html ?? 0} />
+                        </span>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
               )}
             </div>
           </div>

@@ -16,10 +16,11 @@ export async function GET() {
     const supabase = getSupabaseAdmin();
     const nowIso = new Date().toISOString();
 
-    const [urlCount, textCount, fileCount, todayCountResult, userCountResult] = await Promise.all([
+    const [urlCount, textCount, fileCount, htmlCount, todayCountResult, userCountResult] = await Promise.all([
       countActiveByType(supabase, nowIso, 'url'),
       countActiveByType(supabase, nowIso, 'text'),
       countActiveByType(supabase, nowIso, 'file'),
+      countActiveByType(supabase, nowIso, 'html'),
       supabase
         .from('short_urls')
         .select('*', { count: 'exact', head: true })
@@ -30,13 +31,14 @@ export async function GET() {
     return NextResponse.json({
       status: 'success',
       data: {
-        total: urlCount + textCount + fileCount,
+        total: urlCount + textCount + fileCount + htmlCount,
         today: todayCountResult.count || 0,
         users: userCountResult.count || 0,
         byType: {
           url: urlCount,
           text: textCount,
           file: fileCount,
+          html: htmlCount,
         },
       },
     });
