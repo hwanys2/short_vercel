@@ -590,15 +590,12 @@ export default function UrlForm({ user, onResult }) {
               )}
 
               <div className="url-form-file-hint" style={{ marginTop: '10px', lineHeight: '1.5' }}>
-                <p style={{ margin: '0 0 6px 0' }}>
+                <p style={{ margin: 0 }}>
                   💡 <strong>바이브코딩(Claude, Cursor, Bolt, v0 등) 단일 HTML 호스팅:</strong>
                   <br />
                   단축 주소 접속 시 다운로드가 아닌 <strong>웹사이트 화면이 브라우저에서 바로 열립니다.</strong>
                   <br />
                   (Tailwind CSS CDN, React CDN, 아이콘, 폰트 등이 인라인/CDN으로 포함된 단일 HTML 파일 권장)
-                </p>
-                <p style={{ margin: 0, color: 'var(--text-muted, #64748b)', fontSize: '0.82rem' }}>
-                  🍎 <strong>Mac 텍스트 편집기(TextEdit) 주의사항:</strong> 코드를 복사해 텍스트 편집기에 붙여넣고 저장할 때 서식(RTF) 상태면 웹 태그가 글자로 깨질 수 있습니다. <code>Shift+Cmd+T</code>(일반 텍스트 만들기) 후 저장하시거나 위 <strong>'HTML 코드 직접 입력'</strong>에 바로 붙여넣으시면 가장 안전합니다.
                 </p>
               </div>
             </>
