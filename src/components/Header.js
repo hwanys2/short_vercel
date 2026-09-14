@@ -55,6 +55,21 @@ function IconLayout({ size = 16 }) {
   );
 }
 
+function IconTrendingUp({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M23 6l-9.5 9.5-5-5L1 18"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M17 6h6v6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function IconUser({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -320,6 +335,17 @@ export default function Header() {
                           {user.is_admin && (
                             <>
                               <Link
+                                href="/admin"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconTrendingUp />
+                                </MenuItemIcon>
+                                관리자 대시보드
+                              </Link>
+                              <Link
                                 href="/admin/slots"
                                 className="account-dropdown-item"
                                 role="menuitem"
@@ -381,6 +407,17 @@ export default function Header() {
                           </Link>
                           {user.is_admin && (
                             <>
+                              <Link
+                                href="/admin"
+                                className="account-dropdown-item"
+                                role="menuitem"
+                                onClick={() => setMenuOpen(false)}
+                              >
+                                <MenuItemIcon>
+                                  <IconTrendingUp />
+                                </MenuItemIcon>
+                                관리자 대시보드
+                              </Link>
                               <Link
                                 href="/admin/slots"
                                 className="account-dropdown-item"

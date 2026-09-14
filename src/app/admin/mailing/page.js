@@ -332,6 +332,12 @@ export default function AdminMailingPage() {
             </button>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <Link
+                href="/admin"
+                className="btn btn-sm btn-secondary"
+              >
+                대시보드
+              </Link>
+              <Link
                 href="/admin/link-account"
                 className="btn btn-sm btn-secondary"
               >

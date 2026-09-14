@@ -235,6 +235,9 @@ export default function AdminSlotsPage() {
 
           {/* 관리자 서브 탭 바로가기 */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap' }}>
+            <Link href="/admin" className="btn btn-sm btn-secondary">
+              대시보드
+            </Link>
             <Link href="/admin/slots" className="btn btn-sm btn-primary">
               코드 슬롯 관리
             </Link>

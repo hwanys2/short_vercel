@@ -484,6 +484,32 @@ export default function ProfilePage() {
                     }}
                   >
                     <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>관리자 대시보드</div>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        신규 가입자 및 단축 URL 생성 추이, 서비스 접속 현황 통계를 확인합니다.
+                      </p>
+                    </div>
+                    <Link
+                      href="/admin"
+                      className="btn btn-primary btn-sm"
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      대시보드 바로가기 →
+                    </Link>
+                  </div>
+
+                  <div style={{ height: '1px', background: 'var(--border-color, #e5e7eb)' }} />
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
                       <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>본인코드 슬롯 관리</div>
                       <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                         특정 사용자의 본인코드 최대 보유 슬롯(기본 2개)을 늘려줍니다.
