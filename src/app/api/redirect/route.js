@@ -6,6 +6,33 @@ import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 import { resolveOwnerCode } from '@/lib/userCodes';
 import { getR2Client, getR2BucketName, isR2Configured, getR2PublicUrl } from '@/lib/r2';
 
+function decodeMacTextEditHtml(htmlString) {
+  if (
+    !htmlString ||
+    (!htmlString.includes('Cocoa HTML Writer') &&
+      !htmlString.includes('&lt;!DOCTYPE') &&
+      !htmlString.includes('&lt;html'))
+  ) {
+    return htmlString;
+  }
+  const bodyMatch = htmlString.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  let content = bodyMatch ? bodyMatch[1] : htmlString;
+  content = content
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<span class="Apple-converted-space">[\s\S]*?<\/span>/gi, ' ')
+    .replace(/<[^>]+>/gi, '');
+  content = content
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  return content.trim();
+}
+
 export async function GET(request) {
   const { searchParams } = request.nextUrl;
   const code =
@@ -118,7 +145,9 @@ export async function GET(request) {
               Key: urlFilePath,
             });
             const s3Response = await s3.send(command);
-            return new Response(s3Response.Body.transformToWebStream(), {
+            const rawHtml = await s3Response.Body.transformToString('utf-8');
+            const finalHtml = decodeMacTextEditHtml(rawHtml);
+            return new Response(finalHtml, {
               status: 200,
               headers: {
                 'Content-Type': 'text/html; charset=utf-8',
@@ -132,8 +161,10 @@ export async function GET(request) {
           const fallbackUrl = getR2PublicUrl(urlFilePath);
           if (fallbackUrl && fallbackUrl.startsWith('http')) {
             const res = await fetch(fallbackUrl);
-            if (res.ok && res.body) {
-              return new Response(res.body, {
+            if (res.ok) {
+              const rawHtml = await res.text();
+              const finalHtml = decodeMacTextEditHtml(rawHtml);
+              return new Response(finalHtml, {
                 status: 200,
                 headers: {
                   'Content-Type': 'text/html; charset=utf-8',

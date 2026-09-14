@@ -12,8 +12,37 @@ import { uploadShortFileAuto } from '@/lib/fileUploadClient';
 import { useLinkScope, parseScopeSelectValue } from '@/lib/useLinkScope';
 import { TEMP_SCOPE, TEMP_LINK_DURATION_OPTIONS } from '@/lib/tempLinks';
 
+function cleanMacTextEditHtmlString(htmlString) {
+  if (
+    !htmlString ||
+    (!htmlString.includes('Cocoa HTML Writer') &&
+      !htmlString.includes('&lt;!DOCTYPE') &&
+      !htmlString.includes('&lt;html'))
+  ) {
+    return htmlString;
+  }
+  const bodyMatch = htmlString.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  let content = bodyMatch ? bodyMatch[1] : htmlString;
+  content = content
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<span class="Apple-converted-space">[\s\S]*?<\/span>/gi, ' ')
+    .replace(/<[^>]+>/gi, '');
+  content = content
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  return content.trim();
+}
+
 export default function UrlForm({ user, onResult }) {
-  const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file'
+  const [mode, setMode] = useState('url'); // 'url' | 'text' | 'file' | 'html'
+  const [htmlInputMode, setHtmlInputMode] = useState('file'); // 'file' | 'paste'
+  const [htmlCode, setHtmlCode] = useState('');
   const [originalUrl, setOriginalUrl] = useState('');
   const [textContent, setTextContent] = useState('');
   const [file, setFile] = useState(null);
@@ -79,18 +108,23 @@ export default function UrlForm({ user, onResult }) {
     }
 
     if (mode === 'file' || mode === 'html') {
-      if (!file) {
+      if (mode === 'html' && htmlInputMode === 'paste') {
+        if (!htmlCode.trim()) {
+          setError('HTML 코드를 입력해주세요.');
+          return;
+        }
+      } else if (!file) {
         setError(mode === 'html' ? 'HTML 파일을 선택해주세요.' : '파일을 선택해주세요.');
         return;
       }
-      if (mode === 'html') {
+      if (mode === 'html' && htmlInputMode !== 'paste' && file) {
         const ext = file.name.split('.').pop()?.toLowerCase();
         if (ext !== 'html' && ext !== 'htm') {
           setError('HTML 파일(.html, .htm)만 업로드할 수 있습니다.');
           return;
         }
       }
-      if (file.size > MAX_FILE_BYTES) {
+      if (file && file.size > MAX_FILE_BYTES) {
         setError(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
         return;
       }
@@ -100,11 +134,18 @@ export default function UrlForm({ user, onResult }) {
 
     try {
       if (mode === 'file' || mode === 'html') {
+        let uploadTargetFile = file;
+        if (mode === 'html' && htmlInputMode === 'paste') {
+          const cleaned = cleanMacTextEditHtmlString(htmlCode.trim());
+          const blob = new Blob([cleaned], { type: 'text/html; charset=utf-8' });
+          uploadTargetFile = new File([blob], 'index.html', { type: 'text/html; charset=utf-8' });
+        }
+
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
 
         const result = await uploadShortFileAuto({
-          file,
+          file: uploadTargetFile,
           customCode: customCode.trim(),
           codeId: isLoggedIn ? selectedScope : null,
           expireDuration,
@@ -120,6 +161,7 @@ export default function UrlForm({ user, onResult }) {
 
         onResult(result.data);
         setFile(null);
+        setHtmlCode('');
         setCustomCode('');
         setPasswordProtect(false);
         setLinkPassword('');
@@ -200,6 +242,21 @@ export default function UrlForm({ user, onResult }) {
         return;
       }
       setExpireDuration('1month');
+
+      // Mac 텍스트 편집기 등으로 저장 시 서식(RTF) 이스케이프가 발생한 경우 자동 복원
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result;
+        if (typeof text === 'string' && (text.includes('Cocoa HTML Writer') || text.includes('&lt;!DOCTYPE') || text.includes('&lt;html'))) {
+          const cleaned = cleanMacTextEditHtmlString(text);
+          const blob = new Blob([cleaned], { type: 'text/html; charset=utf-8' });
+          const cleanedFile = new File([blob], selectedFile.name, { type: 'text/html; charset=utf-8' });
+          setFile(cleanedFile);
+        } else {
+          setFile(selectedFile);
+        }
+      };
+      reader.readAsText(selectedFile);
       return;
     }
 
@@ -226,6 +283,7 @@ export default function UrlForm({ user, onResult }) {
     setMode(newMode);
     setError('');
     setFile(null);
+    setHtmlCode('');
     if (newMode === 'file' && file) {
       if (file.size > 1024 * 1024 * 1024) {
         setExpireDuration('48h');
@@ -236,6 +294,18 @@ export default function UrlForm({ user, onResult }) {
       }
     } else if (newMode === 'html') {
       setExpireDuration('1month');
+    }
+  };
+
+  const handleLoadSampleHtml = async () => {
+    try {
+      const res = await fetch('/sample-vibe.html');
+      if (res.ok) {
+        const code = await res.text();
+        setHtmlCode(code);
+      }
+    } catch (err) {
+      console.error('Failed to load sample HTML:', err);
     }
   };
 
@@ -367,56 +437,170 @@ export default function UrlForm({ user, onResult }) {
             </>
           ) : mode === 'html' ? (
             <>
-              <label className="form-label" htmlFor="share-html">
-                HTML 파일 (.html, .htm) <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>(바이브코딩 웹페이지)</span>
-              </label>
-              <input
-                id="share-html"
-                type="file"
-                accept=".html,.htm,text/html"
-                className="form-input"
-                onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-                required
-              />
-
-              {/* 선택된 HTML 파일 상세 정보 및 안내 배너 */}
-              {file && (
-                <div
+              {/* HTML 입력 방식 토글: 파일 업로드 vs 코드 직접 붙여넣기 */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setHtmlInputMode('file'); setError(''); }}
                   style={{
-                    marginTop: '12px',
-                    padding: '12px 14px',
-                    background: 'rgba(59, 130, 246, 0.08)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    flex: 1,
+                    padding: '8px 12px',
                     borderRadius: '8px',
                     fontSize: '0.88rem',
+                    fontWeight: htmlInputMode === 'file' ? '600' : '500',
+                    border: '1px solid',
+                    borderColor: htmlInputMode === 'file' ? 'var(--primary, #3b82f6)' : 'var(--border-color, #e2e8f0)',
+                    background: htmlInputMode === 'file' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    color: htmlInputMode === 'file' ? 'var(--primary, #2563eb)' : 'var(--text-muted, #64748b)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
+                  📁 HTML 파일 업로드
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setHtmlInputMode('paste'); setError(''); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.88rem',
+                    fontWeight: htmlInputMode === 'paste' ? '600' : '500',
+                    border: '1px solid',
+                    borderColor: htmlInputMode === 'paste' ? 'var(--primary, #3b82f6)' : 'var(--border-color, #e2e8f0)',
+                    background: htmlInputMode === 'paste' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    color: htmlInputMode === 'paste' ? 'var(--primary, #2563eb)' : 'var(--text-muted, #64748b)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  📝 HTML 코드 직접 입력
+                </button>
+              </div>
+
+              {htmlInputMode === 'file' ? (
+                <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontWeight: '600', wordBreak: 'break-all' }}>🌐 {file.name}</span>
-                    <span style={{ fontWeight: '700', color: '#2563eb', marginLeft: '8px', whiteSpace: 'nowrap' }}>
-                      {formatFileSize(file.size)}
-                    </span>
+                    <label className="form-label" htmlFor="share-html" style={{ margin: 0 }}>
+                      HTML 파일 (.html, .htm)
+                    </label>
+                    <a
+                      href="/sample-vibe.html"
+                      download="sample-vibe.html"
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: '#2563eb',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(59, 130, 246, 0.25)',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      📥 샘플 파일 다운로드
+                    </a>
                   </div>
-                  <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.45', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                    <span style={{ flexShrink: 0 }}>🚀</span>
-                    <span>
-                      {isMemberPermanent ? (
-                        <><strong>회원 영구 보관:</strong> 링크를 삭제하기 전까지 영구적으로 웹사이트가 열리며, 링크 삭제 시 R2 스토리지에서도 즉시 삭제됩니다.</>
-                      ) : (
-                        <><strong>임시 보관:</strong> 선택한 만료 기간 동안 웹사이트가 열리며, 기간 종료 시 R2 파일과 링크가 자동 정리됩니다.</>
-                      )}
-                    </span>
+                  <input
+                    id="share-html"
+                    type="file"
+                    accept=".html,.htm,text/html"
+                    className="form-input"
+                    onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                    required={!file}
+                  />
+
+                  {/* 선택된 HTML 파일 상세 정보 및 안내 배너 */}
+                  {file && (
+                    <div
+                      style={{
+                        marginTop: '12px',
+                        padding: '12px 14px',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        borderRadius: '8px',
+                        fontSize: '0.88rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontWeight: '600', wordBreak: 'break-all' }}>🌐 {file.name}</span>
+                        <span style={{ fontWeight: '700', color: '#2563eb', marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                          {formatFileSize(file.size)}
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.45', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                        <span style={{ flexShrink: 0 }}>🚀</span>
+                        <span>
+                          {isMemberPermanent ? (
+                            <><strong>회원 영구 보관:</strong> 링크를 삭제하기 전까지 영구적으로 웹사이트가 열리며, 링크 삭제 시 R2 스토리지에서도 즉시 삭제됩니다.</>
+                          ) : (
+                            <><strong>임시 보관:</strong> 선택한 만료 기간 동안 웹사이트가 열리며, 기간 종료 시 R2 파일과 링크가 자동 정리됩니다.</>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" htmlFor="html-code" style={{ margin: 0 }}>
+                      HTML 코드 붙여넣기
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleLoadSampleHtml}
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: '#2563eb',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(59, 130, 246, 0.25)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      ✨ 샘플 코드 채우기
+                    </button>
                   </div>
-                </div>
+                  <textarea
+                    id="html-code"
+                    className="form-input form-textarea"
+                    placeholder="<!DOCTYPE html><html>... (여기에 완성된 단일 HTML 코드를 붙여넣으세요)"
+                    value={htmlCode}
+                    onChange={(e) => setHtmlCode(e.target.value)}
+                    required
+                    rows={8}
+                    style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  />
+                  {htmlCode.length > 0 && (
+                    <div className="form-textarea-counter" style={{ marginTop: '4px' }}>
+                      {htmlCode.length.toLocaleString()}자 입력됨 (자동으로 index.html 변환 후 R2에 호스팅됩니다)
+                    </div>
+                  )}
+                </>
               )}
 
-              <p className="url-form-file-hint" style={{ marginTop: '8px', lineHeight: '1.5' }}>
-                💡 <strong>바이브코딩(Claude, Cursor, Bolt, v0 등) 단일 HTML 호스팅:</strong>
-                <br />
-                HTML 파일을 올리면 단축 주소 접속 시 다운로드가 아닌 <strong>웹사이트 화면이 브라우저에서 바로 열립니다.</strong>
-                <br />
-                (Tailwind CSS CDN, React CDN, 아이콘, 폰트 등이 인라인/CDN으로 포함된 단일 HTML 파일 업로드를 권장합니다.)
-              </p>
+              <div className="url-form-file-hint" style={{ marginTop: '10px', lineHeight: '1.5' }}>
+                <p style={{ margin: '0 0 6px 0' }}>
+                  💡 <strong>바이브코딩(Claude, Cursor, Bolt, v0 등) 단일 HTML 호스팅:</strong>
+                  <br />
+                  단축 주소 접속 시 다운로드가 아닌 <strong>웹사이트 화면이 브라우저에서 바로 열립니다.</strong>
+                  <br />
+                  (Tailwind CSS CDN, React CDN, 아이콘, 폰트 등이 인라인/CDN으로 포함된 단일 HTML 파일 권장)
+                </p>
+                <p style={{ margin: 0, color: 'var(--text-muted, #64748b)', fontSize: '0.82rem' }}>
+                  🍎 <strong>Mac 텍스트 편집기(TextEdit) 주의사항:</strong> 코드를 복사해 텍스트 편집기에 붙여넣고 저장할 때 서식(RTF) 상태면 웹 태그가 글자로 깨질 수 있습니다. <code>Shift+Cmd+T</code>(일반 텍스트 만들기) 후 저장하시거나 위 <strong>'HTML 코드 직접 입력'</strong>에 바로 붙여넣으시면 가장 안전합니다.
+                </p>
+              </div>
             </>
           ) : (
             <>
