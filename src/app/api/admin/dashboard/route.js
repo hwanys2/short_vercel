@@ -101,6 +101,7 @@ export async function GET(request) {
       typeUrlCountResult,
       typeFileCountResult,
       typeTextCountResult,
+      typeHtmlCountResult,
       todayUsersCountResult,
       todayUrlsCountResult,
       yesterdayUsersCountResult,
@@ -121,6 +122,7 @@ export async function GET(request) {
       admin.from('short_urls').select('*', { count: 'exact', head: true }).eq('type', 'url'),
       admin.from('short_urls').select('*', { count: 'exact', head: true }).eq('type', 'file'),
       admin.from('short_urls').select('*', { count: 'exact', head: true }).eq('type', 'text'),
+      admin.from('short_urls').select('*', { count: 'exact', head: true }).eq('type', 'html'),
 
       // 오늘 신규 수치 (KST 00:00:00 이후)
       admin.from('short_users').select('*', { count: 'exact', head: true }).gte('created_at', todayStartIso),
@@ -200,7 +202,7 @@ export async function GET(request) {
         urls: 0,
         memberUrls: 0,
         guestUrls: 0,
-        urlTypes: { url: 0, file: 0, text: 0 },
+        urlTypes: { url: 0, file: 0, text: 0, html: 0 },
         visits: 0,
       });
     }
@@ -331,6 +333,7 @@ export async function GET(request) {
           url: typeUrlCountResult.count || 0,
           file: typeFileCountResult.count || 0,
           text: typeTextCountResult.count || 0,
+          html: typeHtmlCountResult.count || 0,
         },
         today: {
           date: todayStr,

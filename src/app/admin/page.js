@@ -691,8 +691,8 @@ export default function AdminDashboardPage() {
                     <span style={{ color: 'var(--text-muted)' }}>({summary?.totalGoogleUsers}명)</span>
                   </div>
                   <div style={{ marginTop: 10, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    링크 {summary?.urlTypes.url.toLocaleString()} · 파일 {summary?.urlTypes.file.toLocaleString()} · 메모{' '}
-                    {summary?.urlTypes.text.toLocaleString()}
+                    링크 {summary?.urlTypes.url.toLocaleString()} · 파일 {summary?.urlTypes.file.toLocaleString()} · 웹페이지{' '}
+                    {(summary?.urlTypes.html || 0).toLocaleString()} · 메모 {summary?.urlTypes.text.toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -950,12 +950,19 @@ export default function AdminDashboardPage() {
                         color: 'var(--secondary)',
                       },
                       {
+                        label: '웹페이지 (HTML)',
+                        count: summary?.urlTypes.html || 0,
+                        color: '#f59e0b',
+                      },
+                      {
                         label: '텍스트 메모 (Text)',
                         count: summary?.urlTypes.text || 0,
                         color: 'var(--accent)',
                       },
                     ].map((item) => {
-                      const pct = summary?.totalUrls ? Math.round((item.count / summary.totalUrls) * 100) : 0;
+                      const rawPct = summary?.totalUrls ? (item.count / summary.totalUrls) * 100 : 0;
+                      const pctLabel = rawPct > 0 && rawPct < 1 ? '< 1%' : `${Math.round(rawPct)}%`;
+                      const barWidth = rawPct > 0 && rawPct < 1 ? '1.5%' : `${Math.round(rawPct)}%`;
                       return (
                         <div key={item.label}>
                           <div
@@ -968,7 +975,7 @@ export default function AdminDashboardPage() {
                           >
                             <span style={{ fontWeight: 600 }}>{item.label}</span>
                             <span style={{ color: 'var(--text-muted)' }}>
-                              {item.count.toLocaleString()}건 ({pct}%)
+                              {item.count.toLocaleString()}건 ({pctLabel})
                             </span>
                           </div>
                           <div
@@ -981,7 +988,7 @@ export default function AdminDashboardPage() {
                           >
                             <div
                               style={{
-                                width: `${pct}%`,
+                                width: barWidth,
                                 height: '100%',
                                 background: item.color,
                                 borderRadius: 4,
