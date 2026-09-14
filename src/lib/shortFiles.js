@@ -274,7 +274,7 @@ export async function deleteShortUrlWithFile(rowOrId) {
   }
   if (!row?.id) return;
 
-  if ((row.type || '') === 'file' && row.file_path) {
+  if (((row.type || '') === 'file' || (row.type || '') === 'html') && row.file_path) {
     await deleteShortFile(row.file_path);
   }
 

@@ -111,7 +111,10 @@ export async function POST(request) {
         expireDuration = '1week',
         linkPasswordEnabled = false,
         linkPassword = '',
+        type = 'file',
       } = body;
+
+      const isHtmlType = type === 'html';
 
       if (!key || !isR2Key(key)) {
         return NextResponse.json(
@@ -172,11 +175,22 @@ export async function POST(request) {
         await deleteShortUrlWithFile(existing);
       }
 
-      const expirationDate = calculateFileExpirationDate({
-        userId: isMemberPermanent ? userId : null,
-        expireDuration,
-        fileSize,
-      });
+      let expirationDate;
+      if (isHtmlType) {
+        if (isMemberPermanent) {
+          // 회원 HTML 웹페이지: 영구 보관 (100년)
+          expirationDate = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString();
+        } else {
+          // 비회원 및 임시 HTML 웹페이지: 선택 기간 적용 (기본 1개월)
+          expirationDate = new Date(Date.now() + tempLinkDurationMs(expireDuration, '1month')).toISOString();
+        }
+      } else {
+        expirationDate = calculateFileExpirationDate({
+          userId: isMemberPermanent ? userId : null,
+          expireDuration,
+          fileSize,
+        });
+      }
 
       const insertData = applyOwnerColumns(
         {
@@ -184,11 +198,11 @@ export async function POST(request) {
           code,
           expiration_date: expirationDate,
           visits: 0,
-          type: 'file',
+          type: isHtmlType ? 'html' : 'file',
           file_path: key,
-          file_name: fileName || 'file',
+          file_name: fileName || (isHtmlType ? 'index.html' : 'file'),
           file_size: Number(fileSize) || 0,
-          file_mime: fileMime || 'application/octet-stream',
+          file_mime: isHtmlType ? 'text/html; charset=utf-8' : (fileMime || 'application/octet-stream'),
         },
         { userId, ownerCode, isTemp }
       );
@@ -226,14 +240,16 @@ export async function POST(request) {
       return NextResponse.json(
         {
           status: 'success',
-          message: '파일 공유 주소가 성공적으로 만들어졌습니다.',
+          message: isHtmlType
+            ? 'HTML 웹페이지 공유 주소가 성공적으로 만들어졌습니다.'
+            : '파일 공유 주소가 성공적으로 만들어졌습니다.',
           data: {
             short_url: shortUrl,
             original_url: publicUrl,
             code,
             expiration_date: expirationDate,
-            type: 'file',
-            file_name: fileName,
+            type: isHtmlType ? 'html' : 'file',
+            file_name: fileName || (isHtmlType ? 'index.html' : 'file'),
             file_size: fileSize,
             username: isMemberPermanent ? ownerCode.username : null,
             user_code_id: isMemberPermanent ? ownerCode.id : null,

@@ -43,7 +43,7 @@ async function cleanupExpiredGuests(supabase) {
     if (!rows || rows.length === 0) break;
 
     const filePaths = rows
-      .filter((r) => r.type === 'file' && r.file_path)
+      .filter((r) => (r.type === 'file' || r.type === 'html') && r.file_path)
       .map((r) => r.file_path);
 
     if (filePaths.length > 0) {

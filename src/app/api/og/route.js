@@ -45,11 +45,13 @@ export async function GET(request) {
       ? '비밀번호로 보호된 링크'
       : kind === 'missing'
         ? '링크를 찾을 수 없습니다'
-        : kind === 'file'
-          ? (data?.title || '파일 공유').replace(/\s*\|\s*숏\.한국$/, '')
-          : kind === 'text'
-            ? '텍스트 공유'
-            : data?.code || '단축 주소';
+        : kind === 'html'
+          ? (data?.title || '웹페이지 공유').replace(/\s*\|\s*숏\.한국$/, '')
+          : kind === 'file'
+            ? (data?.title || '파일 공유').replace(/\s*\|\s*숏\.한국$/, '')
+            : kind === 'text'
+              ? '텍스트 공유'
+              : data?.code || '단축 주소';
 
   const subtitle =
     kind === 'locked'
@@ -61,13 +63,15 @@ export async function GET(request) {
   const badge =
     kind === 'locked'
       ? '잠긴 링크'
-      : kind === 'file'
-        ? '파일'
-        : kind === 'text'
-          ? '텍스트'
-          : kind === 'missing'
-            ? '없음'
-            : 'URL';
+      : kind === 'html'
+        ? '웹페이지'
+        : kind === 'file'
+          ? '파일'
+          : kind === 'text'
+            ? '텍스트'
+            : kind === 'missing'
+              ? '없음'
+              : 'URL';
 
   let fonts = [];
   try {

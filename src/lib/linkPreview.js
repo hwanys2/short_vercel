@@ -152,6 +152,21 @@ export async function loadLinkPreviewData({ code, username }) {
     };
   }
 
+  if (type === 'html') {
+    const name = urlData.file_name || '웹페이지';
+    return {
+      found: true,
+      passwordProtected: false,
+      type: 'html',
+      code: normalizedCode,
+      username: unlockUsername,
+      title: `${normalizedCode} · 웹페이지 | 숏.한국`,
+      description: '숏.한국으로 공유된 웹페이지입니다.',
+      shortUrl,
+      ogImagePath: `${ogBase}&kind=html`,
+    };
+  }
+
   if (type === 'file') {
     const name = urlData.file_name || '파일';
     const size = formatFileSize(urlData.file_size);

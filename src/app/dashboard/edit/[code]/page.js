@@ -223,8 +223,16 @@ function EditUrlPageInner() {
 
       if (urlType === 'text') {
         payload.text_content = textContent;
-      } else if (urlType === 'file') {
+      } else if (urlType === 'file' || urlType === 'html') {
         if (replacementFile) {
+          if (urlType === 'html') {
+            const ext = replacementFile.name.split('.').pop()?.toLowerCase();
+            if (ext !== 'html' && ext !== 'htm') {
+              setError('HTML 파일(.html, .htm)만 업로드할 수 있습니다.');
+              setSaving(false);
+              return;
+            }
+          }
           if (replacementFile.size > MAX_FILE_BYTES) {
             setError(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
             setSaving(false);
@@ -239,12 +247,13 @@ function EditUrlPageInner() {
             onProgress: (prog) => setUploadProgress(prog),
             signal: abortController.signal,
             isEdit: true,
+            folder: urlType === 'html' ? 'html' : null,
           });
 
           payload.new_file_key = uploaded.key;
           payload.new_file_name = uploaded.fileName;
           payload.new_file_size = uploaded.fileSize;
-          payload.new_file_mime = uploaded.fileMime;
+          payload.new_file_mime = urlType === 'html' ? 'text/html; charset=utf-8' : uploaded.fileMime;
           payload.new_public_url = uploaded.publicUrl;
         }
       } else {
@@ -292,8 +301,9 @@ function EditUrlPageInner() {
 
   const isText = urlType === 'text';
   const isFile = urlType === 'file';
-  const pageTitle = isText ? '텍스트 수정' : isFile ? '파일 공유 수정' : 'URL 수정';
-  const cardTitle = isText ? '📋 텍스트 편집' : isFile ? '📎 파일 공유 편집' : '✏️ 단축 URL 편집';
+  const isHtml = urlType === 'html';
+  const pageTitle = isText ? '텍스트 수정' : isHtml ? '웹페이지(HTML) 수정' : isFile ? '파일 공유 수정' : 'URL 수정';
+  const cardTitle = isText ? '📋 텍스트 편집' : isHtml ? '🌐 웹페이지(HTML) 편집' : isFile ? '📎 파일 공유 편집' : '✏️ 단축 URL 편집';
   const linkExpired = expirationDate && new Date(expirationDate) <= new Date();
 
   return (
@@ -320,25 +330,29 @@ function EditUrlPageInner() {
               </Link>
             </div>
             <div className="card-body">
+              {error && (
+                <div className="alert alert-error" style={{ marginBottom: '20px' }}>
+                  {error}
+                </div>
+              )}
+
               {loadingUrl ? (
-                <div style={{ textAlign: 'center', padding: '32px' }}>
+                <div style={{ textAlign: 'center', padding: '40px' }}>
                   <span className="spinner" style={{ borderTopColor: 'var(--primary)' }} />
                 </div>
-              ) : error && !customCode ? (
-                <div className="alert alert-danger">⚠️ {error}</div>
               ) : (
                 <form onSubmit={handleSubmit}>
-                  {error && <div className="alert alert-danger" style={{ marginBottom: '16px' }}>⚠️ {error}</div>}
-
-                  {/* URL 타입: 원본 URL 입력 */}
-                  {!isText && !isFile && (
+                  {/* URL 타입: 원본 URL */}
+                  {!isText && !isFile && !isHtml && (
                     <div className="form-group">
-                      <label className="form-label" htmlFor="edit-original">원본 URL</label>
+                      <label className="form-label" htmlFor="edit-original-url">
+                        원본 URL
+                      </label>
                       <input
-                        id="edit-original"
+                        id="edit-original-url"
                         type="url"
                         className="form-input"
-                        placeholder="https://example.com"
+                        placeholder="https://example.com/very-long-url-here"
                         value={originalUrl}
                         onChange={(e) => setOriginalUrl(e.target.value)}
                         required
@@ -346,10 +360,12 @@ function EditUrlPageInner() {
                     </div>
                   )}
 
-                  {/* 텍스트 타입: 텍스트 내용 입력 */}
+                  {/* 텍스트 타입: 텍스트 내용 */}
                   {isText && (
                     <div className="form-group">
-                      <label className="form-label" htmlFor="edit-text-content">텍스트 내용</label>
+                      <label className="form-label" htmlFor="edit-text-content">
+                        공유할 텍스트
+                      </label>
                       <textarea
                         id="edit-text-content"
                         className="form-input form-textarea"
@@ -357,7 +373,7 @@ function EditUrlPageInner() {
                         value={textContent}
                         onChange={(e) => setTextContent(e.target.value)}
                         required
-                        rows={8}
+                        rows={6}
                         maxLength={50000}
                       />
                       {textContent.length > 0 && (
@@ -367,6 +383,85 @@ function EditUrlPageInner() {
                       )}
                     </div>
                   )}
+
+                  {/* HTML 웹페이지: 현재 파일 상태 및 새 HTML 파일 교체 UI */}
+                  {isHtml && (() => {
+                    const isExpired = isTargetTemp && expirationDate && new Date(expirationDate) <= new Date();
+                    return (
+                      <div className="form-group" style={{ background: 'var(--surface)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                        <label className="form-label" style={{ fontWeight: 600, fontSize: '0.95rem' }}>웹페이지(HTML) 파일 정보</label>
+
+                        {/* 현재 등록된 파일 상태 카드 */}
+                        <div style={{ padding: '12px 14px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span style={{ fontWeight: 600, wordBreak: 'break-all' }}>🌐 {fileName || 'index.html'}</span>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                              {fileSize != null ? formatFileSize(fileSize) : ''}
+                            </span>
+                          </div>
+                          <div style={{ marginTop: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              background: isExpired ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                              color: isExpired ? '#ef4444' : '#10b981',
+                            }}>
+                              {isExpired ? '🚫 만료됨' : '🟢 웹사이트 호스팅 중'}
+                            </span>
+                            {!isTargetTemp ? (
+                              <span style={{ color: 'var(--text-muted)' }}>
+                                ✨ 회원 영구 보관 (삭제 시 R2에서 즉시 삭제)
+                              </span>
+                            ) : expirationDate ? (
+                              <span style={{ color: 'var(--text-muted)' }}>
+                                만료일: {new Date(expirationDate).toLocaleString('ko-KR')}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* 새 HTML 파일 등록 인풋 */}
+                        <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '14px' }}>
+                          <label className="form-label" htmlFor="edit-replace-html" style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                            🔄 새 HTML 파일로 교체 (선택)
+                          </label>
+                          <input
+                            id="edit-replace-html"
+                            type="file"
+                            accept=".html,.htm,text/html"
+                            className="form-input"
+                            onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
+                          />
+                          <p style={{ margin: '6px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
+                            기존 HTML 웹페이지를 유지하려면 비워 두세요. 새 파일을 선택하고 저장하면 기존 R2 파일은 자동 삭제되고 새 HTML로 교체됩니다.
+                          </p>
+
+                          {replacementFile && (
+                            <div
+                              style={{
+                                marginTop: '12px',
+                                padding: '12px',
+                                background: 'rgba(59, 130, 246, 0.08)',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: '600' }}>선택된 새 HTML: {replacementFile.name}</span>
+                                <span style={{ fontWeight: '700', color: '#2563eb' }}>{formatFileSize(replacementFile.size)}</span>
+                              </div>
+                              <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.4' }}>
+                                🚀 저장 시 이전 파일은 정리되고 새 웹페이지가 즉시 배포/반영됩니다.
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 파일 타입: 현재 파일 상태 및 새 파일 교체 UI */}
                   {isFile && (() => {

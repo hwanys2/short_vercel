@@ -167,7 +167,7 @@ export default function UrlResult({ data, user }) {
           </p>
           <div className="result-actions">
             <a href={data.short_url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
-              🔗 링크 열기
+              {data.type === 'html' ? '🌐 웹사이트 열기' : '🔗 링크 열기'}
             </a>
             <span className="expiration-info">
               ⏰ {expirationText}

@@ -37,7 +37,7 @@ export async function POST(request) {
       );
     }
 
-    const { fileName, fileSize, fileType, customCode, isEdit } = body;
+    const { fileName, fileSize, fileType, customCode, isEdit, folder } = body;
 
     const size = Number(fileSize);
     if (!fileSize || isNaN(size) || size <= 0) {
@@ -142,11 +142,14 @@ export async function POST(request) {
     // 5GB 초대용량 파일 및 느린 업로드 회선 환경을 고려하여 넉넉한 만료 시간(4시간~6시간) 부여
     const expiresIn = size > R2_LARGE_FOLDER_THRESHOLD_BYTES ? 6 * 3600 : 4 * 3600;
 
+    const targetFolder = folder === 'html' ? 'html' : undefined;
+
     const { presignedUrl, key, publicUrl } = await createR2PresignedUploadUrl({
       fileName: cleanFileName,
       fileSize: size,
       mimeType: mimeResult.mime,
       expiresIn,
+      folder: targetFolder,
     });
 
     return NextResponse.json({

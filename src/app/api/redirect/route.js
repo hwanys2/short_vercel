@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { normalizeShortPathSegment, readMiddlewareShortHeader } from '@/lib/pathSegments';
 import { isValidLinkUnlockCookie } from '@/lib/linkUnlock';
 import { resolveOwnerCode } from '@/lib/userCodes';
+import { getR2Client, getR2BucketName, isR2Configured, getR2PublicUrl } from '@/lib/r2';
 
 export async function GET(request) {
   const { searchParams } = request.nextUrl;
@@ -24,6 +26,7 @@ export async function GET(request) {
 
     let originalUrl = null;
     let urlType = 'url';
+    let urlFilePath = null;
 
     if (username) {
       // 회원 URL 패턴: /username/code
@@ -35,7 +38,7 @@ export async function GET(request) {
 
       const { data: urlData } = await supabase
         .from('short_urls')
-        .select('original_url, id, link_password_hash, link_password_unlock_version, type, text_content')
+        .select('original_url, id, link_password_hash, link_password_unlock_version, type, text_content, file_path')
         .eq('code', code)
         .eq('user_code_id', owner.codeId)
         .single();
@@ -49,6 +52,7 @@ export async function GET(request) {
           if (isValidLinkUnlockCookie(request, username, code, unlockVersion)) {
             originalUrl = urlData.original_url;
             urlType = urlData.type || 'url';
+            urlFilePath = urlData.file_path;
             supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
           } else {
             const gate = new URL('/link-gate', request.url);
@@ -59,6 +63,7 @@ export async function GET(request) {
         } else {
           originalUrl = urlData.original_url;
           urlType = urlData.type || 'url';
+          urlFilePath = urlData.file_path;
           supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
         }
       }
@@ -66,7 +71,7 @@ export async function GET(request) {
       // 비회원 URL 패턴: /code (만료되지 않은 것만)
       const { data: urlData } = await supabase
         .from('short_urls')
-        .select('original_url, id, expiration_date, type, text_content, link_password_hash, link_password_unlock_version')
+        .select('original_url, id, expiration_date, type, text_content, link_password_hash, link_password_unlock_version, file_path')
         .eq('code', code)
         .is('user_id', null)
         .gt('expiration_date', new Date().toISOString())
@@ -81,6 +86,7 @@ export async function GET(request) {
           if (isValidLinkUnlockCookie(request, '', code, unlockVersion)) {
             originalUrl = urlData.original_url;
             urlType = urlData.type || 'url';
+            urlFilePath = urlData.file_path;
             supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
           } else {
             const gate = new URL('/link-gate', request.url);
@@ -90,12 +96,61 @@ export async function GET(request) {
         } else {
           originalUrl = urlData.original_url;
           urlType = urlData.type || 'url';
+          urlFilePath = urlData.file_path;
           supabase.rpc('increment_short_url_visits', { p_url_id: urlData.id }).then(() => {});
         }
       }
     }
 
     if (originalUrl) {
+      // HTML 타입이면 R2에서 직접 읽어와 브라우저에 웹페이지로 렌더링
+      if (urlType === 'html') {
+        if (!urlFilePath) {
+          return NextResponse.redirect(new URL('/missing.link', request.url), 302);
+        }
+
+        try {
+          if (isR2Configured()) {
+            const s3 = getR2Client();
+            const bucket = getR2BucketName();
+            const command = new GetObjectCommand({
+              Bucket: bucket,
+              Key: urlFilePath,
+            });
+            const s3Response = await s3.send(command);
+            return new Response(s3Response.Body.transformToWebStream(), {
+              status: 200,
+              headers: {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Cache-Control': 'public, max-age=60, s-maxage=300',
+                'X-Content-Type-Options': 'nosniff',
+              },
+            });
+          }
+
+          // R2 자격증명 미설정 시 공개 URL 폴백
+          const fallbackUrl = getR2PublicUrl(urlFilePath);
+          if (fallbackUrl && fallbackUrl.startsWith('http')) {
+            const res = await fetch(fallbackUrl);
+            if (res.ok && res.body) {
+              return new Response(res.body, {
+                status: 200,
+                headers: {
+                  'Content-Type': 'text/html; charset=utf-8',
+                  'Cache-Control': 'public, max-age=60, s-maxage=300',
+                  'X-Content-Type-Options': 'nosniff',
+                },
+              });
+            }
+          }
+
+          return NextResponse.redirect(new URL('/missing.link', request.url), 302);
+        } catch (err) {
+          console.error('HTML serving error:', err);
+          return NextResponse.redirect(new URL('/missing.link', request.url), 302);
+        }
+      }
+
       // 텍스트 타입이면 텍스트 뷰어 페이지로 리다이렉트
       if (urlType === 'text') {
         const textViewUrl = new URL('/text-view', request.url);

@@ -267,6 +267,7 @@ export default function DashboardPage() {
                     { id: 'url', label: 'URL' },
                     { id: 'text', label: '텍스트' },
                     { id: 'file', label: '파일' },
+                    { id: 'html', label: '웹페이지' },
                   ].map((t) => (
                     <button
                       key={t.id}
@@ -341,7 +342,7 @@ export default function DashboardPage() {
                         const editHref = `/dashboard/edit/${encodeURIComponent(url.code)}?code_id=${encodeURIComponent(rowScopeParam(url))}`;
                         return (
                         <tr key={rowKey}>
-                          <td>{url.type === 'text' ? '📋' : url.type === 'file' ? '📎' : '🔗'}</td>
+                          <td>{url.type === 'text' ? '📋' : url.type === 'file' ? '📎' : url.type === 'html' ? '🌐' : '🔗'}</td>
                           <td>
                             <a href={rowShortUrl(url)} target="_blank" rel="noopener noreferrer">
                               {url.is_temp ? url.code : `${codeUsername}/${url.code}`}
@@ -361,12 +362,19 @@ export default function DashboardPage() {
                           <td className="url-cell" title={
                             url.type === 'text'
                               ? (url.text_preview || '텍스트 메모')
-                              : url.type === 'file'
-                                ? (url.file_name || '파일')
+                              : (url.type === 'file' || url.type === 'html')
+                                ? (url.file_name || (url.type === 'html' ? '웹페이지' : '파일'))
                                 : url.original_url
                           }>
                             {url.type === 'text'
                               ? (url.text_preview ? `${url.text_preview}...` : '텍스트 메모')
+                              : url.type === 'html'
+                                ? (
+                                    <span>
+                                      {url.file_name || 'index.html'}
+                                      <span className="dash-retention-badge is-active" style={{ marginLeft: '6px' }}>웹페이지</span>
+                                    </span>
+                                  )
                               : url.type === 'file'
                                 ? (
                                     <span>

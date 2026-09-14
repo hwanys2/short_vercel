@@ -90,6 +90,7 @@ export async function uploadFileToR2Only({
   onProgress,
   signal,
   isEdit = false,
+  folder = null,
 }) {
   // 1. Presigned URL 발급
   if (onProgress) {
@@ -108,6 +109,7 @@ export async function uploadFileToR2Only({
     isEdit: Boolean(isEdit),
   };
   if (codeId != null) presignBody.code_id = codeId;
+  if (folder) presignBody.folder = folder;
 
   const presignRes = await fetch('/api/upload/r2-presign', {
     method: 'POST',
@@ -169,7 +171,11 @@ export async function uploadShortFileAuto({
   linkPassword = '',
   onProgress,
   signal,
+  type = 'file',
+  folder = null,
 }) {
+  const targetFolder = folder || (type === 'html' ? 'html' : null);
+
   const uploaded = await uploadFileToR2Only({
     file,
     customCode,
@@ -177,6 +183,7 @@ export async function uploadShortFileAuto({
     onProgress,
     signal,
     isEdit: false,
+    folder: targetFolder,
   });
 
   // 3. 완료 및 DB 등록
@@ -198,6 +205,7 @@ export async function uploadShortFileAuto({
     expireDuration,
     linkPasswordEnabled,
     linkPassword: linkPasswordEnabled ? linkPassword.trim() : '',
+    type,
   };
   if (codeId != null) completeBody.code_id = codeId;
 

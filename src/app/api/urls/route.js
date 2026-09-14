@@ -76,7 +76,7 @@ export async function GET(request) {
       query = query.eq('user_code_id', codeFilter);
     }
 
-    if (type === 'url' || type === 'text' || type === 'file') {
+    if (type === 'url' || type === 'text' || type === 'file' || type === 'html') {
       query = query.eq('type', type);
     }
 

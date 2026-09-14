@@ -78,10 +78,17 @@ export default function UrlForm({ user, onResult }) {
       }
     }
 
-    if (mode === 'file') {
+    if (mode === 'file' || mode === 'html') {
       if (!file) {
-        setError('파일을 선택해주세요.');
+        setError(mode === 'html' ? 'HTML 파일을 선택해주세요.' : '파일을 선택해주세요.');
         return;
+      }
+      if (mode === 'html') {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext !== 'html' && ext !== 'htm') {
+          setError('HTML 파일(.html, .htm)만 업로드할 수 있습니다.');
+          return;
+        }
       }
       if (file.size > MAX_FILE_BYTES) {
         setError(`파일 크기는 최대 ${formatFileSize(MAX_FILE_BYTES)}까지 가능합니다.`);
@@ -92,7 +99,7 @@ export default function UrlForm({ user, onResult }) {
     setLoading(true);
 
     try {
-      if (mode === 'file') {
+      if (mode === 'file' || mode === 'html') {
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
 
@@ -107,6 +114,8 @@ export default function UrlForm({ user, onResult }) {
             setUploadProgress(progress);
           },
           signal: abortController.signal,
+          type: mode,
+          folder: mode === 'html' ? 'html' : null,
         });
 
         onResult(result.data);
@@ -117,6 +126,9 @@ export default function UrlForm({ user, onResult }) {
         setConfirmPassword('');
         if (e.target?.querySelector?.('#share-file')) {
           e.target.querySelector('#share-file').value = '';
+        }
+        if (e.target?.querySelector?.('#share-html')) {
+          e.target.querySelector('#share-html').value = '';
         }
         return;
       }
@@ -178,6 +190,19 @@ export default function UrlForm({ user, onResult }) {
     if (!selectedFile) return;
 
     const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+
+    if (mode === 'html') {
+      if (ext !== 'html' && ext !== 'htm') {
+        setError('HTML 파일(.html, .htm)만 업로드할 수 있습니다.');
+        setFile(null);
+        const fileInput = document.getElementById('share-html');
+        if (fileInput) fileInput.value = '';
+        return;
+      }
+      setExpireDuration('1month');
+      return;
+    }
+
     const blockedExts = ['exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'dll', 'sys', 'apk', 'dmg', 'pkg', 'iso', 'sh', 'ps1', 'vbs', 'jar', 'js', 'mjs', 'cjs', 'php', 'asp', 'aspx', 'jsp', 'cgi', 'svg'];
     if (ext && blockedExts.includes(ext)) {
       setError('보안상 직접 실행 파일(.exe, .apk, .dmg 등) 및 스크립트는 업로드할 수 없습니다. 프로그램 공유는 ZIP 압축 파일로 묶어서 업로드해주세요.');
@@ -200,6 +225,7 @@ export default function UrlForm({ user, onResult }) {
     if (newMode === mode) return;
     setMode(newMode);
     setError('');
+    setFile(null);
     if (newMode === 'file' && file) {
       if (file.size > 1024 * 1024 * 1024) {
         setExpireDuration('48h');
@@ -208,6 +234,8 @@ export default function UrlForm({ user, onResult }) {
       } else {
         setExpireDuration('1month');
       }
+    } else if (newMode === 'html') {
+      setExpireDuration('1month');
     }
   };
 
@@ -232,11 +260,13 @@ export default function UrlForm({ user, onResult }) {
   }
 
   const memberBadgeText =
-    mode === 'file'
+    mode === 'html'
+      ? '회원 웹페이지는 영구적으로 보관됩니다 (삭제 시 R2에서도 즉시 삭제)'
+      : mode === 'file'
       ? '파일 공유는 10MB 이하 30일, 10MB~1GB 7일, 1GB 초과 2일간 보관 후 자동 삭제됩니다 (주소는 영구 유지)'
       : `회원 ${mode === 'url' ? 'URL' : '텍스트'}은 영구적으로 유지됩니다`;
 
-  const showDurationPicker = !isMemberPermanent || isR2File;
+  const showDurationPicker = !isMemberPermanent || (isR2File && mode !== 'html');
 
   return (
     <div className="url-form-container">
@@ -285,9 +315,23 @@ export default function UrlForm({ user, onResult }) {
               <span className="mode-tab-text-short">파일</span>
             </span>
           </button>
+          <button
+            type="button"
+            role="tab"
+            className={`mode-tab ${mode === 'html' ? 'is-active' : ''}`}
+            aria-selected={mode === 'html'}
+            aria-label="웹페이지 (HTML)"
+            onClick={() => handleModeChange('html')}
+          >
+            <span className="mode-tab-icon" aria-hidden="true">🌐</span>
+            <span className="mode-tab-text">
+              <span className="mode-tab-text-full">웹페이지 (HTML)</span>
+              <span className="mode-tab-text-short">HTML</span>
+            </span>
+          </button>
         </div>
 
-        {/* URL / Text / File Input */}
+        {/* URL / Text / File / HTML Input */}
         <div className="form-group">
           {mode === 'url' ? (
             <>
@@ -320,6 +364,59 @@ export default function UrlForm({ user, onResult }) {
                   {textContent.length.toLocaleString()} / 50,000자
                 </div>
               )}
+            </>
+          ) : mode === 'html' ? (
+            <>
+              <label className="form-label" htmlFor="share-html">
+                HTML 파일 (.html, .htm) <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>(바이브코딩 웹페이지)</span>
+              </label>
+              <input
+                id="share-html"
+                type="file"
+                accept=".html,.htm,text/html"
+                className="form-input"
+                onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                required
+              />
+
+              {/* 선택된 HTML 파일 상세 정보 및 안내 배너 */}
+              {file && (
+                <div
+                  style={{
+                    marginTop: '12px',
+                    padding: '12px 14px',
+                    background: 'rgba(59, 130, 246, 0.08)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '8px',
+                    fontSize: '0.88rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontWeight: '600', wordBreak: 'break-all' }}>🌐 {file.name}</span>
+                    <span style={{ fontWeight: '700', color: '#2563eb', marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                      {formatFileSize(file.size)}
+                    </span>
+                  </div>
+                  <div style={{ color: 'var(--text-color, #1e293b)', lineHeight: '1.45', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ flexShrink: 0 }}>🚀</span>
+                    <span>
+                      {isMemberPermanent ? (
+                        <><strong>회원 영구 보관:</strong> 링크를 삭제하기 전까지 영구적으로 웹사이트가 열리며, 링크 삭제 시 R2 스토리지에서도 즉시 삭제됩니다.</>
+                      ) : (
+                        <><strong>임시 보관:</strong> 선택한 만료 기간 동안 웹사이트가 열리며, 기간 종료 시 R2 파일과 링크가 자동 정리됩니다.</>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <p className="url-form-file-hint" style={{ marginTop: '8px', lineHeight: '1.5' }}>
+                💡 <strong>바이브코딩(Claude, Cursor, Bolt, v0 등) 단일 HTML 호스팅:</strong>
+                <br />
+                HTML 파일을 올리면 단축 주소 접속 시 다운로드가 아닌 <strong>웹사이트 화면이 브라우저에서 바로 열립니다.</strong>
+                <br />
+                (Tailwind CSS CDN, React CDN, 아이콘, 폰트 등이 인라인/CDN으로 포함된 단일 HTML 파일 업로드를 권장합니다.)
+              </p>
             </>
           ) : (
             <>

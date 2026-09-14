@@ -148,6 +148,7 @@ export async function PATCH(request, { params }) {
     const rowType = row.type || 'url';
     const isTextType = rowType === 'text';
     const isFileType = rowType === 'file';
+    const isHtmlType = rowType === 'html';
 
     if (isTextType) {
       if (text_content !== undefined) {
@@ -158,7 +159,7 @@ export async function PATCH(request, { params }) {
           return NextResponse.json({ success: false, message: '텍스트는 50,000자까지 입력 가능합니다.' }, { status: 400 });
         }
       }
-    } else if (isFileType) {
+    } else if (isFileType || isHtmlType) {
       if (new_file_key) {
         if (!isR2Key(new_file_key)) {
           return NextResponse.json({ success: false, message: '유효한 스토리지 파일 키가 아닙니다.' }, { status: 400 });
@@ -213,8 +214,8 @@ export async function PATCH(request, { params }) {
     }
 
     // 만료 처리
-    // - 임시 → 본인 코드(영구): URL/텍스트는 100년, 파일은 보관 기간 유지
-    // - 본인 코드 → 임시: URL/텍스트는 선택 기간(기본 1주일), 파일은 보관 기간(최대 30일로 상한)
+    // - 임시 → 본인 코드(영구): URL/텍스트/HTML은 100년, 파일은 보관 기간 유지
+    // - 본인 코드 → 임시: URL/텍스트/HTML은 선택 기간(기본 1주일), 파일은 보관 기간(최대 30일로 상한)
     // - 임시 → 임시: expire_duration 있으면 지금부터 재설정(연장), 파일은 변경 불가
     const convertingToTemp = target.temp && !scoped.temp;
     const convertingToPermanent = !target.temp && scoped.temp;
@@ -234,25 +235,33 @@ export async function PATCH(request, { params }) {
       if (text_content !== undefined) {
         updateFields.text_content = text_content;
       }
-    } else if (isFileType) {
+    } else if (isFileType || isHtmlType) {
       if (new_file_key) {
         if (row.file_path) {
           await deleteShortFile(row.file_path);
         }
         updateFields.file_path = new_file_key;
-        updateFields.file_name = new_file_name || 'file';
+        updateFields.file_name = new_file_name || (isHtmlType ? 'index.html' : 'file');
         updateFields.file_size = Number(new_file_size) || 0;
-        updateFields.file_mime = new_file_mime || 'application/octet-stream';
+        updateFields.file_mime = isHtmlType ? 'text/html; charset=utf-8' : (new_file_mime || 'application/octet-stream');
         updateFields.original_url = new_public_url || new_file_key;
 
-        const newSize = Number(new_file_size) || 0;
-        let retentionMs = 30 * 24 * 60 * 60 * 1000;
-        if (newSize > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
-          retentionMs = 2 * 24 * 60 * 60 * 1000;
-        } else if (newSize > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
-          retentionMs = 7 * 24 * 60 * 60 * 1000;
+        if (isHtmlType) {
+          if (!target.temp) {
+            updateFields.expiration_date = new Date(Date.now() + PERMANENT_MS).toISOString();
+          } else {
+            updateFields.expiration_date = tempLinkExpirationIso(expire_duration || '1month');
+          }
+        } else {
+          const newSize = Number(new_file_size) || 0;
+          let retentionMs = 30 * 24 * 60 * 60 * 1000;
+          if (newSize > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
+            retentionMs = 2 * 24 * 60 * 60 * 1000;
+          } else if (newSize > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
+            retentionMs = 7 * 24 * 60 * 60 * 1000;
+          }
+          updateFields.expiration_date = new Date(Date.now() + retentionMs).toISOString();
         }
-        updateFields.expiration_date = new Date(Date.now() + retentionMs).toISOString();
       }
     } else {
       updateFields.original_url = typeof original_url === 'string' ? original_url.trim() : row.original_url;
@@ -346,6 +355,10 @@ export async function PATCH(request, { params }) {
       successMessage = '임시 주소(숏.한국/코드)로 전환되었습니다.';
     } else if (isTextType) {
       successMessage = '텍스트가 수정되었습니다.';
+    } else if (isHtmlType) {
+      successMessage = new_file_key
+        ? '새 HTML 파일이 성공적으로 등록되었습니다.'
+        : '웹페이지 링크가 수정되었습니다.';
     } else if (isFileType) {
       successMessage = new_file_key
         ? '새 파일이 성공적으로 등록되었으며 다운로드 기간이 갱신되었습니다.'
@@ -392,7 +405,7 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'URL을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    if (row.type === 'file' && row.file_path) {
+    if ((row.type === 'file' || row.type === 'html') && row.file_path) {
       await deleteShortFile(row.file_path);
     }
 

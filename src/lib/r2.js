@@ -61,6 +61,7 @@ export function isR2Key(keyOrPath) {
     keyOrPath.startsWith('small/') ||
     keyOrPath.startsWith('normal/') ||
     keyOrPath.startsWith('large/') ||
+    keyOrPath.startsWith('html/') ||
     keyOrPath.includes('.r2.dev/') ||
     keyOrPath.includes('.r2.cloudflarestorage.com/')
   );
@@ -74,7 +75,8 @@ export function extractR2Key(keyOrUrl) {
   if (
     keyOrUrl.startsWith('small/') ||
     keyOrUrl.startsWith('normal/') ||
-    keyOrUrl.startsWith('large/')
+    keyOrUrl.startsWith('large/') ||
+    keyOrUrl.startsWith('html/')
   ) {
     return keyOrUrl;
   }
@@ -84,7 +86,8 @@ export function extractR2Key(keyOrUrl) {
     if (
       pathname.startsWith('small/') ||
       pathname.startsWith('normal/') ||
-      pathname.startsWith('large/')
+      pathname.startsWith('large/') ||
+      pathname.startsWith('html/')
     ) {
       return pathname;
     }
@@ -108,15 +111,19 @@ export function getR2PublicUrl(key) {
 }
 
 /**
- * 안전한 R2 오브젝트 키 생성 (Prefix 분기: <=10MB -> small/, 10MB~1GB -> normal/, 1GB~ -> large/)
+ * 안전한 R2 오브젝트 키 생성 (Prefix 분기: html -> html/, <=10MB -> small/, 10MB~1GB -> normal/, 1GB~ -> large/)
  */
-export function generateR2Key({ fileName, fileSize }) {
-  const n = Number(fileSize) || 0;
+export function generateR2Key({ fileName, fileSize, folder }) {
   let prefix = 'small/';
-  if (n > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
-    prefix = 'large/';
-  } else if (n > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
-    prefix = 'normal/';
+  if (folder === 'html') {
+    prefix = 'html/';
+  } else {
+    const n = Number(fileSize) || 0;
+    if (n > R2_LARGE_FOLDER_THRESHOLD_BYTES) {
+      prefix = 'large/';
+    } else if (n > R2_SMALL_FOLDER_THRESHOLD_BYTES) {
+      prefix = 'normal/';
+    }
   }
 
   const cleanName = String(fileName || 'file')
@@ -133,10 +140,10 @@ export function generateR2Key({ fileName, fileSize }) {
 /**
  * R2 직접 업로드를 위한 Presigned PUT URL 발급
  */
-export async function createR2PresignedUploadUrl({ fileName, fileSize, mimeType, expiresIn = 3600 }) {
+export async function createR2PresignedUploadUrl({ fileName, fileSize, mimeType, expiresIn = 3600, folder }) {
   const s3 = getR2Client();
   const bucket = getR2BucketName();
-  const key = generateR2Key({ fileName, fileSize });
+  const key = generateR2Key({ fileName, fileSize, folder });
 
   // Note: ContentType을 PutObjectCommand에 명시하지 않으면 AWS SDK가 X-Amz-SignedHeaders에
   // content-type을 강제하지 않아 브라우저-서버 간 MIME 사소한 불일치로 인한 403 SignatureDoesNotMatch 오류를 방지합니다.
