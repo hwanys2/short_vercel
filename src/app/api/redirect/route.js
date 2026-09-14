@@ -151,7 +151,7 @@ export async function GET(request) {
               status: 200,
               headers: {
                 'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, max-age=60, s-maxage=300',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'X-Content-Type-Options': 'nosniff',
               },
             });
@@ -168,7 +168,7 @@ export async function GET(request) {
                 status: 200,
                 headers: {
                   'Content-Type': 'text/html; charset=utf-8',
-                  'Cache-Control': 'public, max-age=60, s-maxage=300',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
                   'X-Content-Type-Options': 'nosniff',
                 },
               });
