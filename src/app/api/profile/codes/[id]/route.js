@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
+import { deleteShortFiles } from '@/lib/shortFiles';
 
 export async function DELETE(request, { params }) {
   try {
@@ -36,23 +37,43 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const { count, error: countErr } = await admin
+    // 1. 해당 본인 코드에 속한 파일(R2/Supabase) 정리
+    const { data: fileRows } = await admin
       .from('short_urls')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_code_id', codeId);
+      .select('file_path')
+      .eq('user_code_id', codeId)
+      .eq('user_id', user.id)
+      .not('file_path', 'is', null);
 
-    if (countErr) throw countErr;
-    if ((count || 0) > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `이 본인 코드 아래에 단축 주소가 ${count}개 있습니다. 링크를 모두 삭제하거나 다른 코드로 옮긴 뒤 삭제해주세요.`,
-          url_count: count,
-        },
-        { status: 409 }
-      );
+    const paths = (fileRows || []).map((r) => r.file_path).filter(Boolean);
+    if (paths.length > 0) {
+      try {
+        await deleteShortFiles(paths);
+      } catch (fileErr) {
+        console.error('Delete files error during user code deletion:', fileErr);
+      }
     }
 
+    // 2. 삭제 대상 단축 URL 개수 파악
+    const { count } = await admin
+      .from('short_urls')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_code_id', codeId)
+      .eq('user_id', user.id);
+
+    // 3. 해당 본인 코드에 속한 단축 URL 삭제 (short_visits, short_visits_daily는 ON DELETE CASCADE로 자동 삭제)
+    const { error: urlDelErr } = await admin
+      .from('short_urls')
+      .delete()
+      .eq('user_code_id', codeId)
+      .eq('user_id', user.id);
+
+    if (urlDelErr) {
+      console.error('Delete short_urls error during user code deletion:', urlDelErr);
+      throw urlDelErr;
+    }
+
+    // 4. 본인 코드 행 삭제
     const { error: delErr } = await admin
       .from('short_user_codes')
       .delete()
@@ -77,6 +98,7 @@ export async function DELETE(request, { params }) {
       success: true,
       message: '본인 코드가 삭제되었습니다.',
       deleted_username: row.username,
+      deleted_urls_count: count || 0,
     });
   } catch (error) {
     console.error('Delete user code error:', error);

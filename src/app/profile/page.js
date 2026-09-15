@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import ChangeUsernameModal from '@/components/ChangeUsernameModal';
 import AddUserCodeModal from '@/components/AddUserCodeModal';
 import SlotRequestModal from '@/components/SlotRequestModal';
+import DeleteUserCodeModal from '@/components/DeleteUserCodeModal';
 import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
 
 export default function ProfilePage() {
@@ -25,6 +26,7 @@ export default function ProfilePage() {
   const [editingCode, setEditingCode] = useState(null);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
   const [showSlotRequestModal, setShowSlotRequestModal] = useState(false);
+  const [deletingCode, setDeletingCode] = useState(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -88,26 +90,9 @@ export default function ProfilePage() {
     setMessageType(type);
   };
 
-  const handleDeleteCode = async (code) => {
+  const handleDeleteCode = (code) => {
     if (code.is_primary) return;
-    if (code.url_count > 0) {
-      alert('이 본인 코드 아래에 단축 주소가 있습니다. 링크를 모두 삭제하거나 다른 코드로 옮긴 뒤 삭제해주세요.');
-      return;
-    }
-    if (!confirm(`본인 코드 "${code.username}"을(를) 삭제할까요?`)) return;
-    try {
-      const res = await fetch(`/api/profile/codes/${code.id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!data.success) {
-        flash(data.message || '삭제에 실패했습니다.', 'danger');
-        return;
-      }
-      flash('본인 코드가 삭제되었습니다.');
-      await loadCodes();
-      await loadMe();
-    } catch {
-      flash('네트워크 오류가 발생했습니다.', 'danger');
-    }
+    setDeletingCode(code);
   };
 
   const handleChangePassword = async (e) => {
@@ -322,12 +307,7 @@ export default function ProfilePage() {
                             <button
                               type="button"
                               className="btn btn-danger btn-sm"
-                              disabled={(c.url_count || 0) > 0}
-                              title={
-                                (c.url_count || 0) > 0
-                                  ? '링크를 먼저 삭제하거나 다른 코드로 옮기세요'
-                                  : '본인 코드 삭제'
-                              }
+                              title="본인 코드 삭제"
                               onClick={() => handleDeleteCode(c)}
                             >
                               삭제
@@ -630,6 +610,27 @@ export default function ProfilePage() {
           await loadMe();
         }}
       />
+
+      {deletingCode && (
+        <DeleteUserCodeModal
+          key={deletingCode.id}
+          open={Boolean(deletingCode)}
+          code={deletingCode}
+          onClose={() => setDeletingCode(null)}
+          onDeleted={async (result) => {
+            const name = result?.deleted_username || deletingCode?.username;
+            const urlCount = result?.deleted_urls_count ?? deletingCode?.url_count ?? 0;
+            setDeletingCode(null);
+            if (urlCount > 0) {
+              flash(`본인 코드 "${name}" 및 연결된 단축 주소 ${urlCount}개가 영구 삭제되었습니다.`);
+            } else {
+              flash(`본인 코드 "${name}"이(가) 삭제되었습니다.`);
+            }
+            await loadCodes();
+            await loadMe();
+          }}
+        />
+      )}
 
       {showDeleteModal && (
         <div
