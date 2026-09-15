@@ -3068,7 +3068,7 @@ tr:hover td {
 }
 
 .dashboard-page .url-form-container {
-  max-width: 800px;
+  max-width: 920px;
   margin: 0 auto 32px;
 }
 
@@ -4033,6 +4033,84 @@ tr:hover td {
   color: #b45309;
 }
 
+
+/* 대시보드 테이블 전용 스타일 */
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dash-table th,
+.dash-table td {
+  padding: 12px 10px;
+  vertical-align: middle;
+}
+
+.dash-table th:first-child,
+.dash-table td:first-child {
+  width: 44px;
+  text-align: center;
+  padding-left: 18px;
+  padding-right: 6px;
+}
+
+.dash-table th:nth-child(2),
+.dash-table td:nth-child(2) {
+  min-width: 130px;
+}
+
+.dash-table .url-cell {
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-table th:nth-child(4),
+.dash-table td:nth-child(4) {
+  text-align: center;
+  width: 95px;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.dash-table th:nth-child(5),
+.dash-table td:nth-child(5) {
+  text-align: center;
+  width: 75px;
+}
+
+.dash-table .dash-visits-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.dash-table th:last-child,
+.dash-table td:last-child {
+  text-align: right;
+  padding-right: 18px;
+  width: 160px;
+  min-width: 160px;
+}
+
+.dash-table .url-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+.dash-table .url-actions .btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
 
 .dash-visits-cell {
   display: flex;

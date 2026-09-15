@@ -179,7 +179,7 @@ export default function DashboardPage() {
           </div>
 
           {message && (
-            <div className={`alert alert-${messageType}`} style={{ maxWidth: '800px', margin: '0 auto 20px', lineHeight: '1.5' }}>
+            <div className={`alert alert-${messageType}`} style={{ maxWidth: '920px', margin: '0 auto 20px', lineHeight: '1.5' }}>
               <div>{message}</div>
               {message.includes('CORS') && (
                 <div style={{ marginTop: '8px', fontSize: '0.82rem', padding: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px' }}>
@@ -193,7 +193,7 @@ export default function DashboardPage() {
             <div
               ref={createResultRef}
               className="home-shorten-result"
-              style={{ maxWidth: '800px', margin: '0 auto 24px' }}
+              style={{ maxWidth: '920px', margin: '0 auto 24px' }}
             >
               <UrlResult data={createResult} user={user} />
               <div style={{ textAlign: 'center', marginTop: '12px' }}>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
 
 
           {/* URL 목록 */}
-          <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px' }}>
+          <div className="card" style={{ maxWidth: '920px', margin: '0 auto 24px' }}>
             <div className="card-header">
               🔗 내 URL 목록 <span style={{ color: 'var(--text-muted)', fontWeight: '400', marginLeft: '8px' }}>({total}개)</span>
             </div>
@@ -345,7 +345,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="table-wrapper">
-                  <table>
+                  <table className="dash-table">
                     <thead>
                       <tr>
                         <th>타입</th>
@@ -444,7 +444,7 @@ export default function DashboardPage() {
                                 title="QR 코드 보기 및 다운로드"
                                 aria-label="QR 코드 보기 및 다운로드"
                               >
-                                <IconQrCode size={18} />
+                                <IconQrCode size={16} />
                               </button>
                               <button
                                 type="button"
