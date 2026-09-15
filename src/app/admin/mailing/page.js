@@ -338,16 +338,22 @@ export default function AdminMailingPage() {
                 대시보드
               </Link>
               <Link
-                href="/admin/link-account"
+                href="/admin/slot-requests"
                 className="btn btn-sm btn-secondary"
               >
-                구글 계정 연동
+                슬롯 신청 관리
               </Link>
               <Link
                 href="/admin/slots"
                 className="btn btn-sm btn-secondary"
               >
-                본인코드 슬롯 관리 →
+                코드 슬롯 관리
+              </Link>
+              <Link
+                href="/admin/link-account"
+                className="btn btn-sm btn-secondary"
+              >
+                구글 계정 연동
               </Link>
             </div>
           </div>

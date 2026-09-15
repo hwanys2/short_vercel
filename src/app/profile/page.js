@@ -7,6 +7,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ChangeUsernameModal from '@/components/ChangeUsernameModal';
 import AddUserCodeModal from '@/components/AddUserCodeModal';
+import SlotRequestModal from '@/components/SlotRequestModal';
 import { sanitizeAsciiPasswordInput } from '@/lib/passwordInput';
 
 export default function ProfilePage() {
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
+  const [showSlotRequestModal, setShowSlotRequestModal] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -336,19 +338,34 @@ export default function ProfilePage() {
                     ))}
                   </ul>
                 )}
-                <div className="profile-actions" style={{ marginTop: 12 }}>
+                <div className="profile-actions" style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    disabled={!canAddCode}
-                    onClick={() => setShowAddCodeModal(true)}
+                    className={`btn ${canAddCode ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => {
+                      if (canAddCode) {
+                        setShowAddCodeModal(true);
+                      } else {
+                        setShowSlotRequestModal(true);
+                      }
+                    }}
                   >
-                    코드 추가 ({codes.length}/{maxCodes})
+                    {canAddCode
+                      ? `코드 추가 (${codes.length}/${maxCodes})`
+                      : `코드 추가 (${codes.length}/${maxCodes}) - 슬롯 신청`}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: '0.85rem', color: 'var(--primary, #3b82f6)' }}
+                    onClick={() => setShowSlotRequestModal(true)}
+                  >
+                    🎁 SNS 홍보로 슬롯 받기 / 신청 내역
                   </button>
                 </div>
                 {!canAddCode && (
                   <p className="profile-hint" style={{ marginTop: 8 }}>
-                    본인 코드 한도에 도달했습니다.
+                    본인 코드 한도({maxCodes}개)에 도달했습니다. 버튼을 누르면 <strong>SNS 홍보로 추가 슬롯(+1개)</strong>을 신청할 수 있습니다.
                   </p>
                 )}
               </div>
@@ -598,6 +615,17 @@ export default function ProfilePage() {
         onAdded={async (data) => {
           setShowAddCodeModal(false);
           flash(`본인 코드 "${data?.code?.username || ''}"가 추가되었습니다.`);
+          await loadCodes();
+          await loadMe();
+        }}
+      />
+
+      <SlotRequestModal
+        open={showSlotRequestModal}
+        currentCount={codes.length}
+        maxCodes={maxCodes}
+        onClose={() => setShowSlotRequestModal(false)}
+        onRequested={async () => {
           await loadCodes();
           await loadMe();
         }}

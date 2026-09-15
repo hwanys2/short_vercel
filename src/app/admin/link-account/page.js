@@ -245,12 +245,15 @@ export default function AdminLinkAccountPage() {
           </div>
 
           {/* 관리자 서브 탭 바로가기 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <Link href="/admin" className="btn btn-sm btn-secondary">
               대시보드
             </Link>
+            <Link href="/admin/slot-requests" className="btn btn-sm btn-secondary">
+              슬롯 신청 관리
+            </Link>
             <Link href="/admin/slots" className="btn btn-sm btn-secondary">
-              코드 슬롯 관리
+              코드 슬롯 직접 관리
             </Link>
             <Link href="/admin/link-account" className="btn btn-sm btn-primary">
               구글 계정 연동

@@ -29,6 +29,7 @@ export default function AdminSlotsPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [inputSlots, setInputSlots] = useState({}); // { [userId]: number }
   const [viewMode, setViewMode] = useState('search'); // 'search' | 'boosted'
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   // 관리자 인증 체크
   useEffect(() => {
@@ -82,10 +83,18 @@ export default function AdminSlotsPage() {
     }
   }, []);
 
-  // 초기 로드: 최근 가입 사용자 로드
+  // 초기 로드: 최근 가입 사용자 로드 및 대기 중인 슬롯 신청 수 조회
   useEffect(() => {
     if (authState === 'ok') {
       fetchUsers();
+      fetch('/api/admin/slot-requests?status=pending')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.counts) {
+            setPendingRequestsCount(data.counts.pending || 0);
+          }
+        })
+        .catch(() => {});
     }
   }, [authState, fetchUsers]);
 
@@ -234,12 +243,15 @@ export default function AdminSlotsPage() {
           </div>
 
           {/* 관리자 서브 탭 바로가기 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <Link href="/admin" className="btn btn-sm btn-secondary">
               대시보드
             </Link>
+            <Link href="/admin/slot-requests" className="btn btn-sm btn-secondary">
+              슬롯 신청 관리 {pendingRequestsCount > 0 ? `(${pendingRequestsCount})` : ''}
+            </Link>
             <Link href="/admin/slots" className="btn btn-sm btn-primary">
-              코드 슬롯 관리
+              코드 슬롯 직접 관리
             </Link>
             <Link href="/admin/link-account" className="btn btn-sm btn-secondary">
               구글 계정 연동
@@ -248,6 +260,34 @@ export default function AdminSlotsPage() {
               단체 메일 발송 →
             </Link>
           </div>
+
+          {/* 대기 중인 SNS 홍보 슬롯 신청 안내 배너 */}
+          {pendingRequestsCount > 0 && (
+            <div
+              style={{
+                background: 'rgba(234, 179, 8, 0.12)',
+                border: '1px solid rgba(234, 179, 8, 0.35)',
+                borderRadius: 10,
+                padding: '12px 18px',
+                marginBottom: 20,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+              }}
+            >
+              <div style={{ fontSize: '0.9rem', color: 'var(--text)' }}>
+                🎁 <strong>검토 대기 중인 SNS 홍보 슬롯 신청이 {pendingRequestsCount}건 있습니다.</strong>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginLeft: 8 }}>
+                  사용자가 제출한 홍보 링크를 확인하고 원클릭으로 승인할 수 있습니다.
+                </span>
+              </div>
+              <Link href="/admin/slot-requests" className="btn btn-primary btn-sm" style={{ fontWeight: 700 }}>
+                신청 내역 확인하러 가기 →
+              </Link>
+            </div>
+          )}
 
           {/* 알림 메시지 */}
           {statusMsg && (

@@ -388,8 +388,11 @@ export default function AdminDashboardPage() {
               <IconTrendingUp size={14} />
               대시보드
             </Link>
+            <Link href="/admin/slot-requests" className="btn btn-sm btn-secondary">
+              슬롯 신청 관리
+            </Link>
             <Link href="/admin/slots" className="btn btn-sm btn-secondary">
-              코드 슬롯 관리
+              코드 슬롯 직접 관리
             </Link>
             <Link href="/admin/link-account" className="btn btn-sm btn-secondary">
               구글 계정 연동
