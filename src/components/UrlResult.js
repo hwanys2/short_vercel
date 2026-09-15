@@ -2,10 +2,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
+import QrModal from '@/components/QrModal';
 import { formatTempExpiryDate, formatTempRemaining } from '@/lib/tempLinks';
 
 const QR_PREVIEW = 160;
-const QR_MODAL = 320;
 const QR_EXPORT = 512;
 
 function readQrColors() {
@@ -56,20 +56,6 @@ export default function UrlResult({ data, user }) {
 
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
-
-  useEffect(() => {
-    if (!modalOpen) return;
-    const onKey = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [modalOpen, closeModal]);
 
   const downloadPng = useCallback(() => {
     const canvas = exportCanvasRef.current;
@@ -183,49 +169,13 @@ export default function UrlResult({ data, user }) {
       </div>
 
       {modalOpen && (
-        <div
-          className="qr-modal-backdrop"
-          role="presentation"
-          onClick={closeModal}
-        >
-          <div
-            className="qr-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="qr-modal-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="qr-modal-header">
-              <h4 id="qr-modal-title">QR 코드</h4>
-              <button type="button" className="qr-modal-close" onClick={closeModal} aria-label="닫기">
-                ×
-              </button>
-            </div>
-            <div className="qr-modal-body">
-              <div className="qr-modal-figure">
-                <QRCodeSVG
-                  value={data.short_url}
-                  size={QR_MODAL}
-                  level="M"
-                  bgColor={qrColors.bg}
-                  fgColor={qrColors.fg}
-                  title="단축 URL QR 코드 (크게)"
-                />
-              </div>
-              <p className="qr-modal-url" title={data.short_url}>
-                {data.short_url}
-              </p>
-            </div>
-            <div className="qr-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                닫기
-              </button>
-              <button type="button" className="btn btn-primary" onClick={downloadPng}>
-                PNG로 저장
-              </button>
-            </div>
-          </div>
-        </div>
+        <QrModal
+          isOpen={modalOpen}
+          onClose={closeModal}
+          url={data.short_url}
+          code={data.code}
+          title="QR 코드"
+        />
       )}
     </div>
   );

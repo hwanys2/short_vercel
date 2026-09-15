@@ -2536,12 +2536,56 @@ a:hover {
   margin-bottom: 14px;
 }
 
+.qr-modal-figure svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .qr-modal-url {
   font-size: 0.8rem;
   color: var(--text-muted);
   word-break: break-all;
   line-height: 1.45;
   font-family: 'JetBrains Mono', monospace;
+}
+
+.qr-modal-url-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  margin-top: 4px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.qr-modal-url-box .qr-modal-url {
+  color: var(--text);
+  text-align: left;
+  line-height: 1.35;
+}
+
+.qr-modal-copy-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.qr-modal-sublabel {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+  margin-bottom: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .qr-modal-footer {
@@ -2926,7 +2970,9 @@ tr:hover td {
 
 .url-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
 }
 
 /* ============ Pagination ============ */

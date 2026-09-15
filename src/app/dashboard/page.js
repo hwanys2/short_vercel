@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
@@ -8,6 +8,7 @@ import UrlForm from '@/components/UrlForm';
 import UrlResult from '@/components/UrlResult';
 import { buildShortUrl } from '@/lib/siteUrl';
 import { useLinkScope } from '@/lib/useLinkScope';
+import QrModal, { IconQrCode } from '@/components/QrModal';
 import {
   TEMP_SCOPE,
   formatTempExpiryDate,
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const [fileStatus, setFileStatus] = useState('all');
   const [filterCodeId, setFilterCodeId] = useState('all'); // 'all' | 'temp' | number
   const [createResult, setCreateResult] = useState(null);
+  const [qrModalData, setQrModalData] = useState(null);
   const createResultRef = useRef(null);
 
   const { codes: userCodes, activeUsername: createUsername } = useLinkScope(user);
@@ -141,6 +143,25 @@ export default function DashboardPage() {
 
   const copyUrl = (url) => {
     navigator.clipboard.writeText(rowShortUrl(url)).then(() => alert('URL이 복사되었습니다!'));
+  };
+
+  const handleOpenQr = (url) => {
+    const codeUsername = url.code_username || user.username;
+    const displayName = url.is_temp ? url.code : `${codeUsername}/${url.code}`;
+    const label =
+      url.type === 'text'
+        ? (url.text_preview ? `텍스트: ${url.text_preview}` : '텍스트 메모')
+        : (url.type === 'file' || url.type === 'html')
+          ? `${url.type === 'html' ? '웹페이지' : '파일'}: ${url.file_name || ''}`
+          : url.original_url;
+
+    setQrModalData({
+      url: rowShortUrl(url),
+      code: url.code,
+      username: url.is_temp ? undefined : codeUsername,
+      displayName,
+      label,
+    });
   };
 
   if (!user) return null;
@@ -407,10 +428,31 @@ export default function DashboardPage() {
                               >
                                 ✏️
                               </Link>
-                              <button className="btn btn-secondary btn-icon" onClick={() => copyUrl(url)} title="복사">
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-icon"
+                                onClick={() => copyUrl(url)}
+                                title="URL 복사"
+                                aria-label="URL 복사"
+                              >
                                 📋
                               </button>
-                              <button className="btn btn-danger btn-icon" onClick={() => handleDelete(url)} title="삭제">
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-icon"
+                                onClick={() => handleOpenQr(url)}
+                                title="QR 코드 보기 및 다운로드"
+                                aria-label="QR 코드 보기 및 다운로드"
+                              >
+                                <IconQrCode size={18} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-icon"
+                                onClick={() => handleDelete(url)}
+                                title="삭제"
+                                aria-label="삭제"
+                              >
                                 🗑️
                               </button>
                             </div>
@@ -450,29 +492,45 @@ export default function DashboardPage() {
         </div>
       </main>
       <Footer />
+
+      {qrModalData && (
+        <QrModal
+          isOpen={Boolean(qrModalData)}
+          onClose={() => setQrModalData(null)}
+          url={qrModalData.url}
+          code={qrModalData.code}
+          username={qrModalData.username}
+          displayName={qrModalData.displayName}
+          label={qrModalData.label}
+        />
+      )}
     </>
   );
 }
 
 function MiniVisitBars({ series }) {
-  const byDay = new Map((series || []).map((s) => [s.day, s.count]));
-  const days = [];
-  const now = Date.now();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now - i * 24 * 60 * 60 * 1000);
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(d);
-    const y = parts.find((p) => p.type === 'year')?.value;
-    const m = parts.find((p) => p.type === 'month')?.value;
-    const day = parts.find((p) => p.type === 'day')?.value;
-    days.push(`${y}-${m}-${day}`);
-  }
-  const counts = days.map((day) => byDay.get(day) || 0);
-  const max = Math.max(1, ...counts);
+  const [now] = useState(() => Date.now());
+  const { days, counts, max } = useMemo(() => {
+    const byDay = new Map((series || []).map((s) => [s.day, s.count]));
+    const calculatedDays = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now - i * 24 * 60 * 60 * 1000);
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(d);
+      const y = parts.find((p) => p.type === 'year')?.value;
+      const m = parts.find((p) => p.type === 'month')?.value;
+      const day = parts.find((p) => p.type === 'day')?.value;
+      calculatedDays.push(`${y}-${m}-${day}`);
+    }
+    const calculatedCounts = calculatedDays.map((day) => byDay.get(day) || 0);
+    const calculatedMax = Math.max(1, ...calculatedCounts);
+    return { days: calculatedDays, counts: calculatedCounts, max: calculatedMax };
+  }, [series, now]);
+
   return (
     <div className="mini-visit-bars" title="최근 7일 클릭" aria-hidden="true">
       {counts.map((c, i) => (
