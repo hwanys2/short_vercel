@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAppUser } from '@/lib/session';
+import { notifyAdminSlotRequest } from '@/lib/telegram';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +112,17 @@ export async function POST(request) {
       .single();
 
     if (insertError) throw insertError;
+
+    // 관리자에게 텔레그램 알림 비동기 발송 (알림 실패해도 신청 접수는 유지)
+    notifyAdminSlotRequest({
+      userEmail: user.email,
+      username: user.username,
+      currentSlots: user.max_codes ?? 2,
+      snsUrl: rawUrl,
+      memo,
+    }).catch((err) => {
+      console.error('Telegram notification background error:', err);
+    });
 
     return NextResponse.json({
       success: true,
