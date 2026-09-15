@@ -5,7 +5,11 @@ import { useEffect, useRef } from 'react';
 const AD_CLIENT = 'ca-pub-8902099051011521';
 const DEFAULT_SLOT = '5801358149';
 
-export default function AdSenseSlot({ slot = DEFAULT_SLOT, variant = 'footer' }) {
+export default function AdSenseSlot({
+  slot = DEFAULT_SLOT,
+  variant = 'footer',
+  format = variant === 'inline' ? 'horizontal' : 'auto',
+}) {
   const pushed = useRef(false);
 
   useEffect(() => {
@@ -19,9 +23,17 @@ export default function AdSenseSlot({ slot = DEFAULT_SLOT, variant = 'footer' })
   }, []);
 
   const regionClass =
-    variant === 'rail' ? 'ad-sense-region ad-sense-region--rail' : 'ad-sense-region';
+    variant === 'rail'
+      ? 'ad-sense-region ad-sense-region--rail'
+      : variant === 'inline'
+        ? 'ad-sense-region ad-sense-region--inline'
+        : 'ad-sense-region';
   const innerClass =
-    variant === 'rail' ? 'ad-sense-inner ad-sense-inner--rail' : 'ad-sense-inner';
+    variant === 'rail'
+      ? 'ad-sense-inner ad-sense-inner--rail'
+      : variant === 'inline'
+        ? 'ad-sense-inner ad-sense-inner--inline'
+        : 'ad-sense-inner';
 
   return (
     <div className={regionClass} aria-label="보조 콘텐츠">
@@ -31,7 +43,7 @@ export default function AdSenseSlot({ slot = DEFAULT_SLOT, variant = 'footer' })
           style={{ display: 'block' }}
           data-ad-client={AD_CLIENT}
           data-ad-slot={slot}
-          data-ad-format="auto"
+          data-ad-format={format}
           data-full-width-responsive="true"
         />
       </div>

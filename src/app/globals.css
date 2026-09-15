@@ -1270,12 +1270,18 @@ a:hover {
   grid-template-columns: 1fr;
   grid-template-areas:
     'main'
+    'mid-ad'
     'books'
     'stats';
 }
 
 .home-layout-main {
   grid-area: main;
+}
+
+.home-layout-mid-ad {
+  grid-area: mid-ad;
+  margin: -16px 0 28px;
 }
 
 .home-layout-books {
@@ -1297,6 +1303,10 @@ a:hover {
     margin: 0 auto;
     padding: 0 24px;
     align-items: start;
+  }
+
+  .home-layout-mid-ad {
+    display: none;
   }
 
   .home-layout-ad {
@@ -3166,6 +3176,26 @@ tr:hover td {
   min-height: 250px;
 }
 
+.ad-sense-region--inline {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0;
+  width: 100%;
+}
+
+.ad-sense-inner--inline {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  box-shadow: inset 0 1px 0 var(--surface-inset-highlight);
+  text-align: center;
+}
+
+.ad-sense-inner--inline .adsbygoogle {
+  min-height: 60px;
+}
+
 @media (max-width: 768px) {
   .ad-sense-region {
     margin-top: 32px;
@@ -3174,6 +3204,15 @@ tr:hover td {
 
   .ad-sense-inner {
     padding: 12px 14px 14px;
+  }
+
+  .ad-sense-region--inline {
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  .ad-sense-inner--inline {
+    padding: 8px 10px;
   }
 }
 

@@ -92,6 +92,14 @@ export default function HomePageClient() {
             </div>
           </div>
 
+          {!isWide && (
+            <div className="home-layout-mid-ad">
+              <div className="container">
+                <AdSenseSlot variant="inline" />
+              </div>
+            </div>
+          )}
+
           <aside className={`home-layout-books${isWide ? ' is-rail' : ' is-inline'}`}>
             <div className={isWide ? undefined : 'container'}>
               <DeveloperBooksTeaser layout={isWide ? 'rail' : 'inline'} />
@@ -120,6 +128,7 @@ export default function HomePageClient() {
                   <div className="stat-label">회원 수</div>
                 </div>
               </div>
+
               {statsReady && (
                 <div className="stats-breakdown-wrapper">
                   <div className="stats-breakdown-header">
@@ -177,7 +186,7 @@ export default function HomePageClient() {
           </div>
         </div>
       </main>
-      <Footer suppressAdSense={isWide} />
+      <Footer suppressAdSense={true} />
     </>
   );
 }
