@@ -158,7 +158,10 @@ export async function GET(request) {
           }
 
           // R2 자격증명 미설정 시 공개 URL 폴백
-          const fallbackUrl = getR2PublicUrl(urlFilePath);
+          const fallbackUrl =
+            originalUrl && originalUrl.startsWith('http')
+              ? originalUrl
+              : getR2PublicUrl(urlFilePath);
           if (fallbackUrl && fallbackUrl.startsWith('http')) {
             const res = await fetch(fallbackUrl);
             if (res.ok) {

@@ -33,7 +33,10 @@ const STATIC_PATHS = [
   '/robots.txt',
   '/sitemap.xml',
   '/ads.txt',
+  '/sample-vibe.html',
 ];
+
+const SHORT_CODE_REGEX = /^[가-힣a-zA-Z0-9_\-]+$/;
 
 /** Auth 세션 쿠키 갱신이 필요한 앱 경로 (단축 URL rewrite 제외) */
 function needsAuthRefresh(pathname) {
@@ -73,6 +76,11 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
+  // 점(.)이 들어간 경로는 정적 파일 또는 비단축 URL (단축 코드 및 닉네임에는 점이 허용되지 않음)
+  if (pathname.includes('.')) {
+    return NextResponse.next();
+  }
+
   // URL 세그먼트 추출 (퍼센트 인코딩·NFC 정규화 후 DB와 동일한 문자열로 조회)
   // 단축 URL은 Auth 갱신 없이 rewrite만 — 링크 클릭 지연 방지
   const segments = pathname.split('/').filter(Boolean);
@@ -81,6 +89,9 @@ export async function middleware(request) {
 
   if (segments.length === 1) {
     const code = normalizeShortPathSegment(segments[0]);
+    if (!SHORT_CODE_REGEX.test(code)) {
+      return NextResponse.next();
+    }
     if (socialBot) {
       const u = new URL('/link-preview', request.url);
       u.searchParams.set('code', code);
@@ -96,6 +107,9 @@ export async function middleware(request) {
   if (segments.length === 2) {
     const username = normalizeShortPathSegment(segments[0]);
     const code = normalizeShortPathSegment(segments[1]);
+    if (!SHORT_CODE_REGEX.test(username) || !SHORT_CODE_REGEX.test(code)) {
+      return NextResponse.next();
+    }
     if (socialBot) {
       const u = new URL('/link-preview', request.url);
       u.searchParams.set('username', username);
@@ -116,7 +130,7 @@ export async function middleware(request) {
 
 export const config = {
   matcher: [
-    // 모든 경로에 매칭하되, _next/static, _next/image, favicon.ico 제외
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // 모든 경로에 매칭하되, _next/static, _next/image, favicon.ico 및 정적 파일 확장자 제외
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html|htm|css|js|txt|xml|woff|woff2|ttf|eot)$).*)',
   ],
 };

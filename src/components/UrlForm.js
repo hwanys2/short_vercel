@@ -11,6 +11,7 @@ import {
 import { uploadShortFileAuto } from '@/lib/fileUploadClient';
 import { useLinkScope, parseScopeSelectValue } from '@/lib/useLinkScope';
 import { TEMP_SCOPE, TEMP_LINK_DURATION_OPTIONS } from '@/lib/tempLinks';
+import { SAMPLE_VIBE_HTML } from '@/data/sampleVibeHtml';
 
 function cleanMacTextEditHtmlString(htmlString) {
   if (
@@ -302,11 +303,20 @@ export default function UrlForm({ user, onResult }) {
       const res = await fetch('/sample-vibe.html');
       if (res.ok) {
         const code = await res.text();
-        setHtmlCode(code);
+        if (
+          code &&
+          !code.includes('단축 링크를 찾을 수 없습니다') &&
+          !code.includes('missing.link') &&
+          (code.includes('스피드 수학 퀴즈') || code.includes('<!DOCTYPE html>'))
+        ) {
+          setHtmlCode(code);
+          return;
+        }
       }
     } catch (err) {
       console.error('Failed to load sample HTML:', err);
     }
+    setHtmlCode(SAMPLE_VIBE_HTML);
   };
 
   const isFileMode = mode === 'file';
